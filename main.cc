@@ -10,6 +10,8 @@ using std::string;
 
 // Launches a simple command, without pipe support. Doesn't support command line
 // arguments. If an error occurs, prints error status.
+// Note that the command needs to be a complete path, such as /bin/ls instead of
+// just ls.
 void launch_simple(std::string cmd) {
   pid_t pid = fork();
   int status;
@@ -18,7 +20,7 @@ void launch_simple(std::string cmd) {
     exit(1);
   }
   if (pid == 0) { // child process
-    // I think this is useless
+    // I think this is needless
     char arg[40];
     strcpy(arg, cmd.c_str());
     char *args[] = {arg, 0};
