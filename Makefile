@@ -1,6 +1,6 @@
 CXX=g++
 CPPFLAGS= -g -pthread
-SRCS=main.cc
+SRCS=main.cc command_list.cc pipe.cc
 OBJS=$(subst .cc,.o,$(SRCS))
 
 shell: $(OBJS)
