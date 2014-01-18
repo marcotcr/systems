@@ -1,0 +1,12 @@
+CXX=g++
+CPPFLAGS= -g -pthread
+SRCS=main.cc
+OBJS=$(subst .cc,.o,$(SRCS))
+
+550server: $(OBJS)
+		g++ -o 550server $(OBJS)
+
+run: 550server
+		./550server
+clean:
+		rm -f $(OBJS) 550server

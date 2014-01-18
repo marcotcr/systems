@@ -3,11 +3,10 @@ CPPFLAGS= -g -pthread
 SRCS=main.cc command_list.cc pipe.cc
 OBJS=$(subst .cc,.o,$(SRCS))
 
-shell: $(OBJS)
-		g++ -o shell $(OBJS)
+550shell: $(OBJS)
+		g++ -o 550shell $(OBJS)
 
-run: shell
-		./shell
+run: 550shell
+		./550shell
 clean:
-		rm -f $(OBJS)
-
+		rm -f $(OBJS) 550shell
