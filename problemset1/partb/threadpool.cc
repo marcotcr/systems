@@ -1,9 +1,12 @@
 #include "threadpool.h"
- #include <fcntl.h>
+#include <fcntl.h>
+#include <pthread.h>
+#include <algorithm>
 using std::cout;
 using std::endl;
 using std::string;
 using std::vector;
+using std::map;
 
 void ReadFile(std::string& path, char return_[MAXBUF]) {
   FILE *fp = fopen(path.c_str(), "r");
@@ -27,7 +30,8 @@ vector<pthread_cond_t> ThreadPool::cond2_;
 vector<bool> ThreadPool::working_;
 vector<bool> ThreadPool::can_dispatch_;
 vector<std::string> ThreadPool::file_to_read_;
-vector<int> ThreadPool::file_content_;
+vector<int> ThreadPool::socket_to_write_;
+map<int, int> ThreadPool::file_content_;
 ThreadPool* ThreadPool::instance_ = NULL;
 int ThreadPool::file_pointer_;
 
@@ -38,7 +42,7 @@ ThreadPool* ThreadPool::GetInstance(int num_threads, int file_pointer) {
   return instance_;
 }
 
-long ThreadPool::Dispatch(std::string& filename) {
+void ThreadPool::Dispatch(std::string& filename, int socket_id) {
   // TODO: I have to give the file name here somehow.
 
   pthread_mutex_lock(&dispatch_mutex_);
@@ -59,6 +63,7 @@ long ThreadPool::Dispatch(std::string& filename) {
   }
   //printf("Dispatching %d\n", thread_id);
   file_to_read_[thread_id] = filename;
+  socket_to_write_[thread_id] = socket_id;
   if (!working_[thread_id]) {
     pthread_cond_signal(&cond_[thread_id]);
   }
@@ -66,7 +71,8 @@ long ThreadPool::Dispatch(std::string& filename) {
   can_dispatch_[thread_id] = false;
   pthread_mutex_unlock(&mutex_[thread_id]);
   pthread_mutex_unlock(&dispatch_mutex_);
-  return thread_id;
+  printf("Exit dispatch\n");
+  //return thread_id;
 }
 
 void ThreadPool::Stop(int thread_id) { 
@@ -85,6 +91,10 @@ void ThreadPool::Stop(int thread_id) {
 int ThreadPool::FileContent(int thread_id) {
   return file_content_[thread_id];
 }
+static inline std::string &trim(std::string &s) {
+        s.erase(std::find_if(s.rbegin(), s.rend(), std::not1(std::ptr_fun<int, int>(std::isspace))).base(), s.end());
+        return s;
+}
 void* ThreadPool::Fun(void* threadid) {
   long tid;
   tid = (long) threadid;
@@ -98,14 +108,19 @@ void* ThreadPool::Fun(void* threadid) {
     }
     // char file_contents[MAXBUF];
     //ReadFile(file_to_read_[tid], file_content_[tid]);
-    file_content_[tid] = open(file_to_read_[tid].c_str(), O_RDONLY);
+    // printf("I'm trying to read %d\n", file_to_read_[tid].length());
+    long socket_id = socket_to_write_[tid];
+    file_content_[socket_id] = open(trim(file_to_read_[tid]).c_str(), O_RDONLY);
+    // printf("It is %d\n", file_content_[tid]);
     printf("Hello, thread #%ld!\n", tid);
-    write(file_pointer_, threadid, sizeof(long));
-    sleep(3);
+    sleep(10);
+    void* socket = (void*) socket_id;
+    write(file_pointer_, &socket, sizeof(long));
     working_[tid] = false;
     can_dispatch_[tid] = true;
     pthread_cond_signal(&cond2_[tid]);
     pthread_mutex_unlock(&mutex_[tid]);
+    printf("Bye\n");
   }
   pthread_exit(NULL);
 }
@@ -120,8 +135,8 @@ ThreadPool::ThreadPool(int num_threads, int file_pointer) {
   cond2_.resize(num_threads);
   working_.resize(num_threads);
   can_dispatch_.resize(num_threads);
-  file_content_.resize(num_threads);
   file_to_read_.resize(num_threads);
+  socket_to_write_.resize(num_threads);
   file_pointer_ = file_pointer;
   pthread_attr_t attr;
   pthread_attr_init(&attr);

@@ -2,6 +2,7 @@
 #include <unistd.h>
 #include <stdio.h>
 #include <iostream>
+#include <stdlib.h>
 #include <sys/stat.h>
 #include <string>
 #include <vector>
@@ -90,22 +91,25 @@ string Server::Read(int acceptSock)
 {
 	bzero(buffer_,256);
 	int n = read(acceptSock,buffer_,255);
-	if (n < 0)
-		PrintError("Failed to read from client.");
-
+	if (n < 0) {
+		std::cerr<< "Failed to read from client."<< acceptSock << std::endl;
+		CloseConnection(acceptSock);
+	}
 	return buffer_;
 }
 
 void Server::Write(int acceptSock, std::string message)
 {
 	int n = write(acceptSock,message.c_str(),message.length());
-	if (n < 0)
-		PrintError("Failed to write to socket.");
+	if (n < 0){
+		std::cerr<< "Failed to write to client."<< acceptSock << std::endl;
+	CloseConnection(acceptSock);
+	}
 }
 
 void Server::SendFile(int acceptSock, int fileDescriptor)
 {
-	int offset = 0;
+	off_t offset = 0;
 	struct stat fileStats;
 	fstat(fileDescriptor, &fileStats);
 	sendfile(acceptSock, fileDescriptor, &offset, fileStats.st_size);
