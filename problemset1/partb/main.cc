@@ -64,6 +64,12 @@ int main(int argc, char** argv) {
   do
   {
     cout << "Starting to poll nfds: " << nfds << endl;
+    cout << "Sockets are: ";
+    for (int i = 0; i < nfds; ++i)
+    {
+    	cout << fds[i].fd << " ";
+    }
+    cout << endl;
     pollReturn = poll(fds, nfds, TIMEOUT);
     
     if(pollReturn < 0)
@@ -81,7 +87,7 @@ int main(int argc, char** argv) {
     old_nfds = nfds;
     for (i = 0; i < old_nfds; i++)
     {
-      if (fds[i].revents == 0)
+    	if (fds[i].revents == 0)
       {
         // This means that there is no event for this file descriptor;
         continue;
@@ -143,10 +149,21 @@ int main(int argc, char** argv) {
             }
             // Close the connection
             amtedServer.CloseConnection(socket_id);
-            printf("Removing nfds for socket %d\n" , socket_id);
-            fds[socketid_to_pollfd[socket_id]].fd = -1;
+            printf("Removing fds for socket %ld\n" , socket_id);
+            
+            //fds[socketid_to_pollfd[socket_id]].fd = -1;
+            for (int k = 0; k < old_nfds; ++k)
+            {
+            	if (fds[k].fd == (int)socket_id)
+            	{
+            		printf("Removing fds for socket %ld, k = %d\n" , socket_id,k);
+            		fds[k].fd = -1;
+            		break;
+            	}
+            }
           } while (!should_exit);
-	printf("------------Leaving threadFD\n");
+
+          printf("------------Leaving threadFD\n");
         }
         else
         {
@@ -154,7 +171,7 @@ int main(int argc, char** argv) {
           // i.e. there is some data on accept socket available.
           // so lets read this data, i.e. filename;
           cout << "Received event for fd: " << fds[i].fd <<endl;
-           filenames[fds[i].fd] = amtedServer.Read(fds[i].fd);
+          filenames[fds[i].fd] = amtedServer.Read(fds[i].fd);
           cout << "Received filename from :" << fds[i].fd << " filename: " << filenames[fds[i].fd] <<endl;
 
           // Dispatch a thread to read the file to memory.
@@ -166,7 +183,7 @@ int main(int argc, char** argv) {
       else
       {
         // This means that some other unexpected event has happened
-	printf("%d, %d %d\n", nfds, fds[i].revents, i);
+        printf("%d, %d %d %d\n", nfds, fds[i].revents, fds[i].fd, i);
         unexpected = true;
         break;
       }
@@ -180,7 +197,8 @@ int main(int argc, char** argv) {
     {
       if (fds[i].fd == -1)
       {
-        for(int j = i; j < nfds; j++)
+      	cout << "Removing someone: " << i << endl;
+      	for(int j = i; j < nfds; j++)
         {
           fds[j].fd = fds[j+1].fd;
         }

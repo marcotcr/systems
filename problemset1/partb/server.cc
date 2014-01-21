@@ -112,6 +112,8 @@ void Server::SendFile(int acceptSock, int fileDescriptor)
 	off_t offset = 0;
 	struct stat fileStats;
 	fstat(fileDescriptor, &fileStats);
+	//std::string message = "HAHAHAH!";
+	//write(acceptSock,message.c_str(),message.length());
 	sendfile(acceptSock, fileDescriptor, &offset, fileStats.st_size);
 	close(fileDescriptor);
 }
