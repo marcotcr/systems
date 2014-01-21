@@ -19,6 +19,7 @@ class Server {
 		string Read(int acceptSock);
 		void Write(int acceptSock, string message);
 		void CloseConnection(int acceptSock);
+		void SendFile(int acceptSock, int fileDescriptor);
 		void CloseServer();
 
 		// Returns the socket handle
