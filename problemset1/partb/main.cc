@@ -33,7 +33,7 @@ int main(int argc, char** argv)
 	std::map<long, int> pollFdIndexForThreadId;
 	int threadFD[2];
 	pipe(threadFD);
-	Threadpool *tp = Threadpool::GetInstance(NUM_THREADS, threadFD[1]);
+	ThreadPool *tp = ThreadPool::GetInstance(NUM_THREADS, threadFD[1]);
 
 	if (argc < 3)
 	{
@@ -115,7 +115,7 @@ int main(int argc, char** argv)
 					do
 					{
 						read(threadFD[0], (void *) &currentThreadId, sizeof(long));
-						if (errno == EBLOCK)
+						if (errno == EAGAIN)
 						{
 							cout << "No more threads ready.." << endl;
 							errno = 0;
@@ -130,7 +130,7 @@ int main(int argc, char** argv)
 						}
 						else
 						{
-							amtedServer.SendFile(socketForThreadId[currentThreadId], fileFd));
+							amtedServer.SendFile(socketForThreadId[currentThreadId], fileFd);
 						}
 
 						// Close the connection

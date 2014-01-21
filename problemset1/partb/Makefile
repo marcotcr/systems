@@ -1,6 +1,6 @@
 CXX=g++
 CPPFLAGS= -g -pthread
-SRCS=main.cc server.cc
+SRCS=main.cc server.cc threadpool.cc
 OBJS=$(subst .cc,.o,$(SRCS))
 
 550server: $(OBJS)

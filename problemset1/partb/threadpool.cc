@@ -156,38 +156,38 @@ void *PrintHello(void *threadid) {
   pthread_exit(NULL);
 }
 
-int main (int argc, char ** argv) {
-  int num_threads = 2;
-  char buf[50];
-  // pthread_t threads[num_threads];
-  // int rc;
-  // long t;
-  // for(t=0; t<num_threads; t++){
-  //    printf("In main: creating thread %ld\n", t);
-  //    rc = pthread_create(&threads[t], NULL, PrintHello, (void *)t);
-  //    if (rc){
-  //      printf("ERROR; return code from pthread_create() is %d\n", rc);
-  //      exit(-1);
-  //    }
-  // }
-  ThreadPool* tp = ThreadPool::GetInstance(num_threads, 1);
-  string a = "Makefile";
-  string b = "df  erver.h";
-  printf("Dispatched %ld\n", tp->Dispatch(a));
-  printf("Dispatched %ld\n", tp->Dispatch(b));
-  // tp->Dispatch();
-  // tp->Dispatch();
-  // tp->Dispatch();
-  // tp->Dispatch();
-  // tp->Stop(0);
-  // tp->Stop(1);
-  // tp->Stop(2);
-  sleep(1);
-  printf("%d\n", tp->FileContent(0));
-  printf("%d\n", tp->FileContent(1));
-  // tp->Dispatch(3);
-  // tp->Dispatch(4);
-
-   /* Last thing that main() should do */
-  pthread_exit(NULL);
-}
+// int main (int argc, char ** argv) {
+//   int num_threads = 2;
+//   char buf[50];
+//   // pthread_t threads[num_threads];
+//   // int rc;
+//   // long t;
+//   // for(t=0; t<num_threads; t++){
+//   //    printf("In main: creating thread %ld\n", t);
+//   //    rc = pthread_create(&threads[t], NULL, PrintHello, (void *)t);
+//   //    if (rc){
+//   //      printf("ERROR; return code from pthread_create() is %d\n", rc);
+//   //      exit(-1);
+//   //    }
+//   // }
+//   ThreadPool* tp = ThreadPool::GetInstance(num_threads, 1);
+//   string a = "Makefile";
+//   string b = "df  erver.h";
+//   printf("Dispatched %ld\n", tp->Dispatch(a));
+//   printf("Dispatched %ld\n", tp->Dispatch(b));
+//   // tp->Dispatch();
+//   // tp->Dispatch();
+//   // tp->Dispatch();
+//   // tp->Dispatch();
+//   // tp->Stop(0);
+//   // tp->Stop(1);
+//   // tp->Stop(2);
+//   sleep(1);
+//   printf("%d\n", tp->FileContent(0));
+//   printf("%d\n", tp->FileContent(1));
+//   // tp->Dispatch(3);
+//   // tp->Dispatch(4);
+// 
+//    /* Last thing that main() should do */
+//   pthread_exit(NULL);
+// }

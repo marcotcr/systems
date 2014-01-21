@@ -2,6 +2,7 @@
 #include <unistd.h>
 #include <stdio.h>
 #include <iostream>
+#include <sys/stat.h>
 #include <string>
 #include <vector>
 #include <string.h>
@@ -13,6 +14,7 @@
 #include <sys/poll.h>
 #include <signal.h>
 #include <errno.h>
+#include <sys/sendfile.h>
 
 Server::Server(string serverIPString, int portno, int queueLength)
 {
