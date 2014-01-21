@@ -15,7 +15,7 @@
 #include <sys/poll.h>
 #include <signal.h>
 #include <errno.h>
-#include <sys/sendfile.h>
+// #include <sys/sendfile.h>
 
 Server::Server(string serverIPString, int portno, int queueLength)
 {
@@ -114,7 +114,7 @@ void Server::SendFile(int acceptSock, int fileDescriptor)
 	fstat(fileDescriptor, &fileStats);
 	//std::string message = "HAHAHAH!";
 	//write(acceptSock,message.c_str(),message.length());
-	sendfile(acceptSock, fileDescriptor, &offset, fileStats.st_size);
+	// sendfile(acceptSock, fileDescriptor, &offset, fileStats.st_size);
 	close(fileDescriptor);
 }
 

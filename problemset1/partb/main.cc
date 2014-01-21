@@ -23,10 +23,6 @@ using std::string;
 #define TIMEOUT (5*60*1000)  //timeout of 5 mins for the poll()
 
 int main(int argc, char** argv) {
-//   string az = "Makefile";
-//   printf("%d\n", open("Makefile", O_RDONLY));
-//   printf("%d\n", az.length());
-// 	exit(0);
   string usage = "Usage: ./550server <server_adderess> <port_no>";
   int i, pollReturn, newFd;
   bool unexpected = false;
