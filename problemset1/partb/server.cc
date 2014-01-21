@@ -101,6 +101,15 @@ void Server::Write(int acceptSock, std::string message)
 		PrintError("Failed to write to socket.");
 }
 
+void Server::SendFile(int acceptSock, int fileDescriptor)
+{
+	int offset = 0;
+	struct stat fileStats;
+	fstat(fileDescriptor, &fileStats);
+	sendfile(acceptSock, fileDescriptor, &offset, fileStats.st_size);
+	close(fileDescriptor);
+}
+
 void Server::CloseConnection(int acceptSock)
 {
 	close(acceptSock);

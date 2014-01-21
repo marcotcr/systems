@@ -1,4 +1,5 @@
 #include "server.h"
+#include "threadpool.h"
 #include <unistd.h>
 #include <stdio.h>
 #include <iostream>
@@ -17,6 +18,7 @@ using std::endl;
 using std::string;
 
 #define MAX_NUM_REQ 1000
+#define NUM_THREADS 20
 #define TIMEOUT (5*60*1000)  //timeout of 5 mins for the poll()
 
 int main(int argc, char** argv)
@@ -27,6 +29,11 @@ int main(int argc, char** argv)
 	struct pollfd fds[MAX_NUM_REQ];
 	int nfds = 0, old_nfds = 0;
 	std::map<int, std::string> filenames;
+	std::map<long, int> socketForThreadId;
+	std::map<long, int> pollFdIndexForThreadId;
+	int threadFD[2];
+	pipe(threadFD);
+	Threadpool *tp = Threadpool::GetInstance(NUM_THREADS, threadFD[1]);
 
 	if (argc < 3)
 	{
@@ -44,21 +51,24 @@ int main(int argc, char** argv)
 	// Setting up the initially poll to listen socket file descriptor.
 	fds[0].fd = amtedServer.SocketFD();
 	fds[0].events = POLLIN;
-	nfds++;
+	fds[1].fd = threadFD[0];
+	fds[1].events = POLLIN;
+	nfds = 2;
 
 	do
 	{
 		cout << "Starting to poll nfds: " << nfds << endl;
 		pollReturn = poll(fds, nfds, TIMEOUT);
-		if (pollReturn == 0)
-		{
-			cout << "Poll Timed out.";
-			break;
-		}
 		
 		if(pollReturn < 0)
 		{
 			cout << "Poll failed.";
+			break;
+		}
+
+		if (pollReturn == 0)
+		{
+			cout << "Poll Timed out.";
 			break;
 		}
 
@@ -97,6 +107,38 @@ int main(int argc, char** argv)
 
 					} while (newFd > 0);
 				}
+				else if (fds[i].fd == threadFD[0])
+				{
+					// This is a signal from some thread that it has finished reading the contents of the file to memory.
+					long currentThreadId;
+					int fileFd;
+					do
+					{
+						read(threadFD[0], (void *) &currentThreadId, sizeof(long));
+						if (errno == EBLOCK)
+						{
+							cout << "No more threads ready.." << endl;
+							errno = 0;
+							break;
+						}
+						fileFd = tp->FileContent(currentThreadId);
+						
+						// Send file contents or error message.
+						if (fileFd == -1)
+						{
+							amtedServer.Write(socketForThreadId[currentThreadId], "File doesnt exist or is unavailable for reading.");
+						}
+						else
+						{
+							amtedServer.SendFile(socketForThreadId[currentThreadId], fileFd));
+						}
+
+						// Close the connection
+						amtedServer.CloseConnection(socketForThreadId[currentThreadId]);
+
+						fds[pollFdIndexForThreadId[currentThreadId]].fd = -1;
+					} while (true);
+				}
 				else
 				{
 					// This means that there is an event on some other socket
@@ -106,13 +148,10 @@ int main(int argc, char** argv)
  					filenames[fds[i].fd] = amtedServer.Read(fds[i].fd);
 					cout << "Received filename from :" << fds[i].fd << " filename: " << filenames[fds[i].fd] <<endl;
 
-					// Send back data, I am just returning back the filename for now.
-					amtedServer.Write(fds[i].fd, filenames[fds[i].fd]);
-
-					// Close the connection
-					amtedServer.CloseConnection(fds[i].fd);
-
-					fds[i].fd = -1;
+					// Dispatch a thread to read the file to memory.
+					long threadId = tp->Dispatch(filenames[fds[i].fd]);
+					socketForThreadId[threadId] = fds[i].fd;
+					pollFdIndexForThreadId[threadId] = i;
 				}
 			}
 			else
@@ -149,6 +188,7 @@ int main(int argc, char** argv)
 		if(fds[i].fd >=0)
 			close(fds[i].fd);
 	}
-
+	close(threadFD[0]);
+	close(threadFD[1]);
 	return 0; 
 }
