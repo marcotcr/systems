@@ -13,13 +13,15 @@
 #include <sys/poll.h>
 #include <errno.h>
 #include <vector>
+#include <unordered_map>
 
 using std::cout;
 using std::endl;
 using std::string;
+using std::unordered_map;
 
 #define MAX_NUM_REQ 1000
-#define NUM_THREADS 2
+#define NUM_THREADS 50
 #define TIMEOUT (5*60*1000)  //timeout of 5 mins for the poll()
 
 int main(int argc, char** argv) {
@@ -28,12 +30,12 @@ int main(int argc, char** argv) {
   bool unexpected = false;
   struct pollfd fds[MAX_NUM_REQ];
   int nfds = 0, old_nfds = 0;
-  std::map<int, std::string> filenames;
-  std::map<long, int> socketForThreadId;
-  std::map<long, int> pollFdIndexForThreadId;
+  std::unordered_map<int, std::string> filenames;
   std::map<int, int> socketid_to_pollfd;
   int threadFD[2];
+  // This is a self pipe.
   pipe(threadFD);
+  // Setting the pipe to non-blocking IO.
   fcntl(threadFD[0], F_SETFL, fcntl(threadFD[0], F_GETFL) | O_NONBLOCK);
   ThreadPool *tp = ThreadPool::GetInstance(NUM_THREADS, threadFD[1]);
 
@@ -42,11 +44,11 @@ int main(int argc, char** argv) {
     std::cerr << usage;
     exit(1);
   }
-  string serverName = argv[1];
+  string server_ip = argv[1];
   int portno = atoi(argv[2]);
   
   // Starting the server...
-  Server amtedServer(serverName, portno, 32);
+  Server amtedServer(server_ip, portno, 32);
 
   bzero((char *)&fds, sizeof(fds));
 
@@ -55,50 +57,42 @@ int main(int argc, char** argv) {
   fds[0].events = POLLIN;
   fds[1].fd = threadFD[0];
   fds[1].events = POLLIN;
+  // nfds = number of file descriptors we are polling for.
   nfds = 2;
 
-  do
-  {
+  do {
     cout << "Starting to poll nfds: " << nfds << endl;
     cout << "Sockets are: ";
-    for (int i = 0; i < nfds; ++i)
-    {
+    for (int i = 0; i < nfds; ++i) {
     	cout << fds[i].fd << " ";
     }
     cout << endl;
+
+    // This is the poll call.
     pollReturn = poll(fds, nfds, TIMEOUT);
-    
-    if(pollReturn < 0)
-    {
+    if(pollReturn < 0) {
       cout << "Poll failed.";
       break;
-    }
-
-    if (pollReturn == 0)
-    {
+    } else if (pollReturn == 0) {
       cout << "Poll Timed out.";
       break;
     }
 
     old_nfds = nfds;
-    for (i = 0; i < old_nfds; i++)
-    {
-    	if (fds[i].revents == 0)
-      {
-        // This means that there is no event for this file descriptor;
+    for (i = 0; i < old_nfds; i++) {
+      // This means that there is no event for this file descriptor;
+    	if (fds[i].revents == 0) {
         continue;
       }
 
-      if (fds[i].revents & (POLLIN))
-      {
-        // This means that there is an event on this file descriptor
-        // So lets figure out what socket this is.
-        if (fds[i].fd == amtedServer.SocketFD())
-        {
-          // Listen for connections socket has an event
-          // So lets accept all the queued up connections
-          do
-          {
+      // This means that there is an event on this file descriptor
+      // So lets figure out what socket this is.
+      if (fds[i].revents & POLLIN) {
+        // This happens when the file descriptor is the socket that accepts
+        // connections.
+        if (fds[i].fd == amtedServer.SocketFD()) {
+          // We accept all of the connections in the queue.
+          do {
             cout << "Accepting connections..."<<endl;
             newFd = amtedServer.Accept();
             if (errno == EWOULDBLOCK)
@@ -107,44 +101,39 @@ int main(int argc, char** argv) {
               errno = 0;
               break; // This means no more incoming connections
             }
-
             cout << "Accepted connection: " << newFd << endl;
             // Add new connection to poll fd list
             fds[nfds].fd = newFd;
             socketid_to_pollfd[newFd] = nfds;
             fds[nfds++].events = POLLIN; 
-
           } while (newFd > 0);
-        }
-        else if (fds[i].fd == threadFD[0])
-        {
-          // This is a signal from some thread that it has finished reading the contents of the file to memory.
-          printf("I'm reading here\n"); 
+        } // This corresponds to the accept socket.
+        // This is if the file descriptor is the self-pipe. If we have an event
+        // here, it means that a thread has finished reading.
+        else if (fds[i].fd == threadFD[0]) {
+          printf("A thread has finished. I'll send the file here."); 
           long socket_id;
           int fileFd;
           bool should_exit = false;
-          do
-          {
+          do {
+            // The working thread writes which socket it has done work for.
             read(threadFD[0], (void *) &socket_id, sizeof(long));
-            if (errno == EWOULDBLOCK | EAGAIN)
-            {
+            if (errno == (EWOULDBLOCK | EAGAIN)) {
               cout << "No more threads ready.." << endl;
               errno = 0;
               should_exit = true;
             }
             fileFd = tp->FileContent(socket_id);
-            
             // Send file contents or error message.
-            if (fileFd == -1)
-            {
+            if (fileFd == -1) {
               amtedServer.Write(socket_id, "File doesnt exist or is unavailable for reading.");
-            }
-            else
-            {
+            } else {
               amtedServer.SendFile(socket_id, fileFd);
             }
             // Close the connection
             amtedServer.CloseConnection(socket_id);
+            tp->CloseSocket(socket_id);
+
             printf("Removing fds for socket %ld\n" , socket_id);
             
             //fds[socketid_to_pollfd[socket_id]].fd = -1;
@@ -158,32 +147,27 @@ int main(int argc, char** argv) {
             	}
             }
           } while (!should_exit);
-
           printf("------------Leaving threadFD\n");
-        }
-        else
-        {
-          // This means that there is an event on some other socket
-          // i.e. there is some data on accept socket available.
-          // so lets read this data, i.e. filename;
+        } // This corresponds to the self pipe.
+        // This else corresponds to some client writing to a socket (requesting
+        // a file).
+        else {
           cout << "Received event for fd: " << fds[i].fd <<endl;
           filenames[fds[i].fd] = amtedServer.Read(fds[i].fd);
           cout << "Received filename from :" << fds[i].fd << " filename: " << filenames[fds[i].fd] <<endl;
-
           // Dispatch a thread to read the file to memory.
           tp->Dispatch(filenames[fds[i].fd], fds[i].fd);
           // socketForThreadId[threadId] = fds[i].fd;
           // pollFdIndexForThreadId[threadId] = i;
         }
-      }
-      else
-      {
+      } // This corresponds to the POLLIN if.
+      else {
         // This means that some other unexpected event has happened
-        printf("%d, %d %d %d\n", nfds, fds[i].revents, fds[i].fd, i);
+        // printf("%d, %d %d %d\n", nfds, fds[i].revents, fds[i].fd, i);
         unexpected = true;
         break;
       }
-    }
+    } // Corresponds to for that goes through file descriptors.
     
     if (unexpected)
       break;
@@ -207,8 +191,7 @@ int main(int argc, char** argv) {
   amtedServer.CloseServer();
   
   // Close all open sockets.
-  for(i = 0; i < nfds; i++)
-  {
+  for(i = 0; i < nfds; i++) {
     if(fds[i].fd >=0)
       close(fds[i].fd);
   }

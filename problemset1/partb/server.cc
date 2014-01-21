@@ -17,7 +17,9 @@
 #include <errno.h>
 // #include <sys/sendfile.h>
 
-Server::Server(string serverIPString, int portno, int queueLength)
+using std::string;
+
+Server::Server(const std::string& serverIPString, int portno, int queueLength)
 {
 	int on = 1;
 	isSocketOpen_ = false;
@@ -29,21 +31,18 @@ Server::Server(string serverIPString, int portno, int queueLength)
 	in_addr_t serverIP = inet_addr(serverIPString.c_str());
 	
 	// Checking for invalid serverIP
-	if (serverIP == INADDR_NONE)
-	{
+	if (serverIP == INADDR_NONE) {
 		PrintError("Server IP string is invalid.");
 	}
 
 	// Set the socket descriptor as reuseable, this is needed for non blocking calls.
 	// Also helps with the "Address already in use" error messages after server restarts.
-	if (setsockopt(sockFD_, SOL_SOCKET, SO_REUSEADDR, (char *)&on, sizeof(on)) < 0)
-	{
+	if (setsockopt(sockFD_, SOL_SOCKET, SO_REUSEADDR, (char *)&on, sizeof(on)) < 0) {
 		PrintError("Failed to allow socket descriptor to be reuseable");
 	}
 
 	// Set socket as non blocking.
-	if (ioctl(sockFD_, FIONBIO, (char *)&on) < 0)
-	{
+	if (ioctl(sockFD_, FIONBIO, (char *)&on) < 0) {
 		PrintError("Failed to set socket as non-blocking.");
 	}
 
@@ -80,14 +79,13 @@ int Server::Accept()
 	socklen_t clientLen = sizeof(client_addr);
 	acceptSockFD_ = accept(sockFD_, (struct sockaddr *) &client_addr, &clientLen);
 	if (acceptSockFD_ < 0)
-		if (errno != EWOULDBLOCK)
-		{
+		if (errno != EWOULDBLOCK) {
 			PrintError("Failed to accept connection.");
 		}
 	return acceptSockFD_;
 }
 
-string Server::Read(int acceptSock)
+std::string Server::Read(int acceptSock)
 {
 	bzero(buffer_,256);
 	int n = read(acceptSock,buffer_,255);
@@ -98,8 +96,7 @@ string Server::Read(int acceptSock)
 	return buffer_;
 }
 
-void Server::Write(int acceptSock, std::string message)
-{
+void Server::Write(int acceptSock, const std::string& message) {
 	int n = write(acceptSock,message.c_str(),message.length());
 	if (n < 0){
 		std::cerr<< "Failed to write to client."<< acceptSock << std::endl;
@@ -107,8 +104,7 @@ void Server::Write(int acceptSock, std::string message)
 	}
 }
 
-void Server::SendFile(int acceptSock, int fileDescriptor)
-{
+void Server::SendFile(int acceptSock, int fileDescriptor) {
 	off_t offset = 0;
 	struct stat fileStats;
 	fstat(fileDescriptor, &fileStats);
@@ -118,18 +114,15 @@ void Server::SendFile(int acceptSock, int fileDescriptor)
 	close(fileDescriptor);
 }
 
-void Server::CloseConnection(int acceptSock)
-{
+void Server::CloseConnection(int acceptSock) {
 	close(acceptSock);
 }
 
-void Server::CloseServer()
-{
+void Server::CloseServer() {
 	close(sockFD_);	
 }
 
-void Server::PrintError(std::string errorMsg)
-{
+void Server::PrintError(const std::string& errorMsg) {
 	std::cerr << errorMsg <<std::endl;
 	if (isSocketOpen_)
 	{
