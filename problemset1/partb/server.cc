@@ -20,6 +20,7 @@
 #endif
 
 using std::string;
+#define TIMEOUT (5*60*1000)  //timeout of 5 mins for the poll()
 
 Server::Server(const std::string& serverIPString, int portno, int queueLength) {
 	int on = 1;
@@ -113,7 +114,33 @@ void Server::SendFile(int acceptSock, int fileDescriptor) {
 	std::string message = "Mac architecture has issues with sendfile(). \n";
 	write(acceptSock,message.c_str(),message.length());
 	#else
-	sendfile(acceptSock, fileDescriptor, &offset, fileStats.st_size);
+	struct pollfd socketFD[1];
+	socketFD[0].fd = acceptSock;
+	socketFD[0].events = POLLOUT;
+	std::cout << "Starting to poll Socket to see if it is writable: "<< acceptSock << std::endl;
+	int pollReturn = poll(socketFD, 1, TIMEOUT);
+
+	if(pollReturn < 0) {
+	  std::cout << "Poll to check if the socket is writable failed."<<std::endl;
+	  return;
+	} else if (pollReturn == 0) {
+	  std::cout << "Poll to check if the socket is writable Timed out." <<std::endl;
+	  return;
+  }
+  if (socketFD[0].revents == POLLOUT)
+  {
+		int bytesWritten = sendfile(acceptSock, fileDescriptor, &offset, fileStats.st_size);
+		if (bytesWritten == -1) {
+	    std::cout << "Sendfile Failed: " << strerror(errno) << std::endl;
+	  }
+	  if (bytesWritten != fileStats.st_size) {
+	    std::cout << "Sendfile didn't send the complete file." << std::endl;
+	  }
+  }
+  else
+  {
+  	std::cout << "Poll to check if the socket is writable returned an unexpected event." << std::endl;
+  }
 	#endif
 	close(fileDescriptor);
 }

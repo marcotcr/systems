@@ -123,6 +123,7 @@ int main(int argc, char** argv) {
               cout << "No more threads ready.." << endl;
               errno = 0;
               should_exit = true;
+              break;
             }
             fileFd = tp->FileContent(socket_id);
             // Send file contents or error message.
