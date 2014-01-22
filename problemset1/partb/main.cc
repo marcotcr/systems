@@ -41,7 +41,7 @@ int main(int argc, char** argv) {
 
   if (argc < 3)
   {
-    std::cerr << usage;
+    std::cerr << usage << endl;
     exit(1);
   }
   string server_ip = argv[1];
