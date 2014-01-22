@@ -56,7 +56,7 @@ Server::Server(const std::string& serverIPString, int portno, int queueLength) {
 	// Binding the server address to the socket file descriptor
 	if (bind(sockFD_, (struct sockaddr *) &server_addr_, sizeof(server_addr_)) < 0)
 		PrintError("Failed to bind socket file descriptor to server address");
-	std::cout << "Server Started with FD: " << sockFD_ << std::endl;
+	std::cout << "Server Started, listening for incoming connections at socket file descriptor: " << sockFD_ << std::endl;
 
 	listen(sockFD_, queueLength);
 
