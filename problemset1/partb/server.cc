@@ -15,12 +15,13 @@
 #include <sys/poll.h>
 #include <signal.h>
 #include <errno.h>
-// #include <sys/sendfile.h>
+#ifndef __APPLE__
+#include <sys/sendfile.h>
+#endif
 
 using std::string;
 
-Server::Server(const std::string& serverIPString, int portno, int queueLength)
-{
+Server::Server(const std::string& serverIPString, int portno, int queueLength) {
 	int on = 1;
 	isSocketOpen_ = false;
 	port_ = portno;
@@ -65,28 +66,26 @@ Server::Server(const std::string& serverIPString, int portno, int queueLength)
 	sa.sa_flags = 0;
 	if (sigaction(SIGPIPE, &sa, 0) == -1)
 		PrintError("Setting SIGPIPE to SIG_IGN failed.");
-
 }
 
-int Server::SocketFD()
-{
+int Server::SocketFD() {
 	return sockFD_;
 }
 
-int Server::Accept()
-{
+int Server::Accept() {
 	struct sockaddr_in client_addr;
 	socklen_t clientLen = sizeof(client_addr);
 	acceptSockFD_ = accept(sockFD_, (struct sockaddr *) &client_addr, &clientLen);
 	if (acceptSockFD_ < 0)
+		// EWOULDBLOCK would mean that there are no more connections on the socket
+		// if that is the case, we dont want to error out.
 		if (errno != EWOULDBLOCK) {
 			PrintError("Failed to accept connection.");
 		}
 	return acceptSockFD_;
 }
 
-std::string Server::Read(int acceptSock)
-{
+std::string Server::Read(int acceptSock) {
 	bzero(buffer_,256);
 	int n = read(acceptSock,buffer_,255);
 	if (n < 0) {
@@ -98,9 +97,9 @@ std::string Server::Read(int acceptSock)
 
 void Server::Write(int acceptSock, const std::string& message) {
 	int n = write(acceptSock,message.c_str(),message.length());
-	if (n < 0){
+	if (n < 0) {
 		std::cerr<< "Failed to write to client."<< acceptSock << std::endl;
-	CloseConnection(acceptSock);
+		CloseConnection(acceptSock);
 	}
 }
 
@@ -108,9 +107,14 @@ void Server::SendFile(int acceptSock, int fileDescriptor) {
 	off_t offset = 0;
 	struct stat fileStats;
 	fstat(fileDescriptor, &fileStats);
-	//std::string message = "HAHAHAH!";
-	//write(acceptSock,message.c_str(),message.length());
-	// sendfile(acceptSock, fileDescriptor, &offset, fileStats.st_size);
+	// the #ifdef is just to make sure that the code compiles properly
+	// on my mac. The code would work properly on linux.
+	#ifdef __APPLE__
+	std::string message = "Mac architecture has issues with sendfile(). \n";
+	write(acceptSock,message.c_str(),message.length());
+	#else
+	sendfile(acceptSock, fileDescriptor, &offset, fileStats.st_size);
+	#endif
 	close(fileDescriptor);
 }
 
@@ -124,8 +128,8 @@ void Server::CloseServer() {
 
 void Server::PrintError(const std::string& errorMsg) {
 	std::cerr << errorMsg <<std::endl;
-	if (isSocketOpen_)
-	{
+	// If the accept connection socket is open, we need to close it in case of error.
+	if (isSocketOpen_) {
 		CloseServer();
 	}
 	exit(1);

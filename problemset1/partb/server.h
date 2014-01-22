@@ -15,9 +15,13 @@ class Server {
   // Accepts a connection and returns acceptSockFD_ (accept socket FD)
   int Accept();
   std::string Read(int acceptSock);
+  // Sends a string of data to the client.
   void Write(int acceptSock, const std::string& message);
+  // Close Client connection.
   void CloseConnection(int acceptSock);
+  // Sends a file to the client using the sendfile system call.
   void SendFile(int acceptSock, int fileDescriptor);
+  // Shuts down the server
   void CloseServer();
   // Returns the socket handle
   int SocketFD();
@@ -28,6 +32,7 @@ class Server {
   char buffer_[256];
   struct sockaddr_in server_addr_;
   struct sockaddr_in client_addr_;
+  // This is private method to handle error and bail out.
   void PrintError(const std::string& errorMsg);
 };
 

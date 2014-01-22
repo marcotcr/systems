@@ -1,6 +1,6 @@
 #ifndef THREADPOOL_H
 #define THREADPOOL_H
-#include <unordered_map>
+#include <tr1/unordered_map>
 #include <unistd.h>
 #include <stdio.h>
 #include <iostream>
@@ -38,7 +38,7 @@ class ThreadPool {
   static std::vector<bool> can_dispatch_;
   static ThreadPool* instance_;
   // Pointer from socket id to file descriptor.
-  static std::unordered_map<int, int> file_content_;
+  static std::tr1::unordered_map<int, int> file_content_;
   // File name 
   static std::vector<std::string> file_to_read_;
   static std::vector<int> socket_to_write_;

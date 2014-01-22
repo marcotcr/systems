@@ -13,12 +13,12 @@
 #include <sys/poll.h>
 #include <errno.h>
 #include <vector>
-#include <unordered_map>
+#include <tr1/unordered_map>
 
 using std::cout;
 using std::endl;
 using std::string;
-using std::unordered_map;
+using std::tr1::unordered_map;
 
 #define MAX_NUM_REQ 1000
 #define NUM_THREADS 50
@@ -30,7 +30,7 @@ int main(int argc, char** argv) {
   bool unexpected = false;
   struct pollfd fds[MAX_NUM_REQ];
   int nfds = 0, old_nfds = 0;
-  std::unordered_map<int, std::string> filenames;
+	unordered_map<int, std::string> filenames;
   std::map<int, int> socketid_to_pollfd;
   int threadFD[2];
   // This is a self pipe.
@@ -63,8 +63,8 @@ int main(int argc, char** argv) {
   do {
     cout << "Starting to poll nfds: " << nfds << endl;
     cout << "Sockets are: ";
-    for (int i = 0; i < nfds; ++i) {
-    	cout << fds[i].fd << " ";
+    for (int loop_var = 0; loop_var < nfds; ++loop_var) {
+    	cout << fds[loop_var].fd << " ";
     }
     cout << endl;
 
@@ -126,7 +126,7 @@ int main(int argc, char** argv) {
             fileFd = tp->FileContent(socket_id);
             // Send file contents or error message.
             if (fileFd == -1) {
-              amtedServer.Write(socket_id, "File doesnt exist or is unavailable for reading.");
+              amtedServer.Write(socket_id, "File doesnt exist or is unavailable for reading.\n");
             } else {
               amtedServer.SendFile(socket_id, fileFd);
             }

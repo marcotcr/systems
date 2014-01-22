@@ -6,7 +6,7 @@ using std::cout;
 using std::endl;
 using std::string;
 using std::vector;
-using std::unordered_map;
+using std::tr1::unordered_map;
 
 vector<pthread_t> ThreadPool::threads_;
 vector<pthread_mutex_t> ThreadPool::mutex_;
