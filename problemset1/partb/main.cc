@@ -41,7 +41,7 @@ int main(int argc, char** argv) {
 
   if (argc < 3)
   {
-    std::cerr << usage << endl;
+    std::cerr << usage;
     exit(1);
   }
   string server_ip = argv[1];
@@ -55,14 +55,15 @@ int main(int argc, char** argv) {
   // Setting up the initially poll to listen socket file descriptor.
   fds[0].fd = amtedServer.SocketFD();
   fds[0].events = POLLIN;
+  cout << "Self-pipe read end file descriptor is: " << threadFD[0] <<endl;
   fds[1].fd = threadFD[0];
   fds[1].events = POLLIN;
   // nfds = number of file descriptors we are polling for.
   nfds = 2;
 
   do {
-    cout << "Starting to poll nfds: " << nfds << endl;
-    cout << "Sockets are: ";
+    cout << "Starting to poll: " << endl;
+    cout << "File descriptors being polled are: ";
     for (int loop_var = 0; loop_var < nfds; ++loop_var) {
     	cout << fds[loop_var].fd << " ";
     }
@@ -97,11 +98,11 @@ int main(int argc, char** argv) {
             newFd = amtedServer.Accept();
             if (errno == EWOULDBLOCK)
             {
-              cout << "No more connections right now.." <<endl;
+              cout << "No more connections in the accept connection socket queue right now.." <<endl;
               errno = 0;
               break; // This means no more incoming connections
             }
-            cout << "Accepted connection: " << newFd << endl;
+            cout << "Accepted connection with file descriptor: " << newFd << endl;
             // Add new connection to poll fd list
             fds[nfds].fd = newFd;
             socketid_to_pollfd[newFd] = nfds;
@@ -111,7 +112,7 @@ int main(int argc, char** argv) {
         // This is if the file descriptor is the self-pipe. If we have an event
         // here, it means that a thread has finished reading.
         else if (fds[i].fd == threadFD[0]) {
-          printf("A thread has finished. I'll send the file here."); 
+          printf("A thread has finished. I'll send the file here.\n"); 
           long socket_id;
           int fileFd;
           bool should_exit = false;
@@ -122,6 +123,7 @@ int main(int argc, char** argv) {
               cout << "No more threads ready.." << endl;
               errno = 0;
               should_exit = true;
+              break;
             }
             fileFd = tp->FileContent(socket_id);
             // Send file contents or error message.
@@ -134,27 +136,24 @@ int main(int argc, char** argv) {
             amtedServer.CloseConnection(socket_id);
             tp->CloseSocket(socket_id);
 
-            printf("Removing fds for socket %ld\n" , socket_id);
+            printf("Done for socket with file descriptor: %ld. Removing from poll list.\n" , socket_id);
             
-            //fds[socketid_to_pollfd[socket_id]].fd = -1;
             for (int k = 0; k < old_nfds; ++k)
             {
             	if (fds[k].fd == (int)socket_id)
             	{
-            		printf("Removing fds for socket %ld, k = %d\n" , socket_id,k);
             		fds[k].fd = -1;
             		break;
             	}
             }
           } while (!should_exit);
-          printf("------------Leaving threadFD\n");
         } // This corresponds to the self pipe.
         // This else corresponds to some client writing to a socket (requesting
         // a file).
         else {
-          cout << "Received event for fd: " << fds[i].fd <<endl;
+          cout << "Received event for socket with file descriptor: " << fds[i].fd <<endl;
           filenames[fds[i].fd] = amtedServer.Read(fds[i].fd);
-          cout << "Received filename from :" << fds[i].fd << " filename: " << filenames[fds[i].fd] <<endl;
+          cout << "Received filename from: " << fds[i].fd << " filename: " << filenames[fds[i].fd] <<endl;
           // Dispatch a thread to read the file to memory.
           tp->Dispatch(filenames[fds[i].fd], fds[i].fd);
           // socketForThreadId[threadId] = fds[i].fd;
@@ -163,7 +162,6 @@ int main(int argc, char** argv) {
       } // This corresponds to the POLLIN if.
       else {
         // This means that some other unexpected event has happened
-        // printf("%d, %d %d %d\n", nfds, fds[i].revents, fds[i].fd, i);
         unexpected = true;
         break;
       }
@@ -177,7 +175,6 @@ int main(int argc, char** argv) {
     {
       if (fds[i].fd == -1)
       {
-      	cout << "Removing someone: " << i << endl;
       	for(int j = i; j < nfds; j++)
         {
           fds[j].fd = fds[j+1].fd;
