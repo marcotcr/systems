@@ -16,6 +16,8 @@ import collections
 import socket
 import time
 import lock_machine
+import argparse
+import numpy as np
  
 
 class Acceptor:
@@ -43,18 +45,63 @@ class Acceptor:
     return response
       
 class PaxosHandler:
-  def __init__(self, n_locks):
+  def __init__(self, n_locks, my_id, nodes, leader):
   # TODO: init from log file
     # TODO: think about this
     self.commands = [None for x in xrange(10000)]
     self.last_run_command = -1
     self.lock_machine = lock_machine.LockMachine(n_locks)
     self.acceptor = Acceptor()
+    self.leader = leader
+    self.my_id = my_id
+    self.nodes = nodes
+    self.num_nodes = len(self.nodes.clients)
+    self.majority = int(np.floor(self.num_nodes / 2)) + 1
+    self.current_proposal_number = 0
+    self.last_command = 0
     pass
  
   def Ping(self):
     print 'pinged'
     return 1
+
+  def RunPhase2(self, instance, cmd):
+    nodes = range(self.num_nodes).remove(self.my_id)
+    responses = []
+    while len(responses) < self.majority:
+      majority = np.random.choice(nodes, size=self.majority, replace=False)
+      for node in majority:
+        if self.nodes.sockets[node].isOpen():
+          try:
+            # This doesnt work with more than 1000 nodes
+            responses.append(self.nodes.clients[node].Propose(self.last_command + 1, self.current_proposal_number * 1000 + self.my_id, cmd))
+          except:
+            pass
+        else:
+          try:
+            self.nodes.transports[node].open()
+          except:
+            pass
+
+          
+  def RunCommand(self, cmd_id, command):
+    print 'Run Command', cmd_id, command
+    if self.my_id == self.leader:
+      pass
+    else:
+      try:
+        self.nodes.transports[self.leader].open()
+        self.nodes.clients[self.leader].RunCommand(cmd_id, command)
+      except:
+        self.ElectNewLeader()
+        #TODO: must still run this command!
+    pass
+    
+  def ElectNewLeader(self):
+    print 'ElectNewLeader'
+    pass
+
+  # This is all other people calling my acceptor.
   def Propose(self, instance, proposal_number, value):
     return self.acceptor.Propose(instance, proposal_number, value)
   def Prepare(self, instance, proposal_number):
@@ -67,18 +114,49 @@ class PaxosHandler:
       response = self.acceptor.Prepare(instance, proposal_number)
     return response
     
+class Nodes:
+  def __init__(self, node_list, my_id):
+    """Node list has each node in the form ip:port"""
+    self.transports = []
+    self.clients = []
+    self.sockets = []
+    for i, node in enumerate(node_list):
+      if i == my_id:
+        self.transports.append(None)
+        self.clients.append(None)
+        continue
+      host, port = node.split(':')
+      socket = TSocket.TSocket(host, port)
+      transport = TTransport.TBufferedTransport(socket)
+      transport.open()
+      protocol = TBinaryProtocol.TBinaryProtocol(transport)
+      client = Paxos.Client(protocol)
+      self.transports.append(transport)
+      self.clients.append(client)
+      self.sockets.append(socket)
 
- 
-handler = PaxosHandler(5)
-processor = Paxos.Processor(handler)
-transport = TSocket.TServerSocket(port=8888)
-tfactory = TTransport.TBufferedTransportFactory()
-pfactory = TBinaryProtocol.TBinaryProtocolFactory()
-
-#server = TServer.TSimpleServer(processor, transport, tfactory, pfactory)
-server = TServer.TThreadedServer(processor, transport, tfactory, pfactory)
- 
- 
-print "Starting python server..."
-server.serve()
-print "done!"
+def main():
+  parser = argparse.ArgumentParser(description='TODO')
+  parser.add_argument('-l', '--num_locks', dest='n_locks', required=True, help="Number of mutexes available", type=int)
+  parser.add_argument('-i', '--my_id', type=int, required=True, help="This machine's ID (must be integer)")
+  parser.add_argument('-n', '--nodes', required=True, dest='nodes', nargs = '+', help="all nodes in the form ip:port")
+  # parser.add_argument('-e', '--error', default=0, type=float, dest='error', help="desired error rate")
+  # parser.add_argument('-o', '--output', default='/dev/null', dest='output', help="output file, saving progress")
+  args = parser.parse_args()
+  nodes = Nodes(args.nodes, args.my_id) 
+  port = int(args.nodes[args.my_id].split(':')[1])
+  handler = PaxosHandler(args.n_locks, args.my_id, nodes, 0)
+  processor = Paxos.Processor(handler)
+  transport = TSocket.TServerSocket(port=port)
+  tfactory = TTransport.TBufferedTransportFactory()
+  pfactory = TBinaryProtocol.TBinaryProtocolFactory()
+  
+  #server = TServer.TSimpleServer(processor, transport, tfactory, pfactory)
+  server = TServer.TThreadedServer(processor, transport, tfactory, pfactory)
+   
+   
+  print "Starting python server..."
+  server.serve()
+  print "done!"
+if __name__ == '__main__':
+  main()

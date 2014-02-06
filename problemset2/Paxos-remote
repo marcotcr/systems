@@ -15,6 +15,7 @@ from thrift.transport import TTransport
 from thrift.transport import TSocket
 from thrift.transport import THttpClient
 from thrift.protocol import TBinaryProtocol
+import time
 
 import Paxos
 from ttypes import *
@@ -84,7 +85,13 @@ if cmd == 'Ping':
   if len(args) != 0:
     print 'Ping requires 0 args'
     sys.exit(1)
-  pp.pprint(client.Ping())
+  while True:
+    try:
+      print 'Status', socket.isOpen()
+      pp.pprint(client.Ping())
+    except:
+      print 'Status', socket.isOpen()
+    time.sleep(1)
 
 elif cmd == 'Propose':
   if len(args) != 3:
