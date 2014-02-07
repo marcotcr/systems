@@ -38,10 +38,19 @@ class Iface:
     """
     pass
 
-  def PrepareFuture(self, proposal_number):
+  def PrepareFuture(self, instance, proposal_number):
     """
     Parameters:
+     - instance
      - proposal_number
+    """
+    pass
+
+  def Learn(self, instance, command):
+    """
+    Parameters:
+     - instance
+     - command
     """
     pass
 
@@ -152,17 +161,19 @@ class Client(Iface):
       return result.success
     raise TApplicationException(TApplicationException.MISSING_RESULT, "Prepare failed: unknown result");
 
-  def PrepareFuture(self, proposal_number):
+  def PrepareFuture(self, instance, proposal_number):
     """
     Parameters:
+     - instance
      - proposal_number
     """
-    self.send_PrepareFuture(proposal_number)
+    self.send_PrepareFuture(instance, proposal_number)
     return self.recv_PrepareFuture()
 
-  def send_PrepareFuture(self, proposal_number):
+  def send_PrepareFuture(self, instance, proposal_number):
     self._oprot.writeMessageBegin('PrepareFuture', TMessageType.CALL, self._seqid)
     args = PrepareFuture_args()
+    args.instance = instance
     args.proposal_number = proposal_number
     args.write(self._oprot)
     self._oprot.writeMessageEnd()
@@ -181,6 +192,36 @@ class Client(Iface):
     if result.success is not None:
       return result.success
     raise TApplicationException(TApplicationException.MISSING_RESULT, "PrepareFuture failed: unknown result");
+
+  def Learn(self, instance, command):
+    """
+    Parameters:
+     - instance
+     - command
+    """
+    self.send_Learn(instance, command)
+    self.recv_Learn()
+
+  def send_Learn(self, instance, command):
+    self._oprot.writeMessageBegin('Learn', TMessageType.CALL, self._seqid)
+    args = Learn_args()
+    args.instance = instance
+    args.command = command
+    args.write(self._oprot)
+    self._oprot.writeMessageEnd()
+    self._oprot.trans.flush()
+
+  def recv_Learn(self):
+    (fname, mtype, rseqid) = self._iprot.readMessageBegin()
+    if mtype == TMessageType.EXCEPTION:
+      x = TApplicationException()
+      x.read(self._iprot)
+      self._iprot.readMessageEnd()
+      raise x
+    result = Learn_result()
+    result.read(self._iprot)
+    self._iprot.readMessageEnd()
+    return
 
   def RunCommand(self, cmd_id, command):
     """
@@ -207,6 +248,7 @@ class Processor(Iface, TProcessor):
     self._processMap["Propose"] = Processor.process_Propose
     self._processMap["Prepare"] = Processor.process_Prepare
     self._processMap["PrepareFuture"] = Processor.process_PrepareFuture
+    self._processMap["Learn"] = Processor.process_Learn
     self._processMap["RunCommand"] = Processor.process_RunCommand
 
   def process(self, iprot, oprot):
@@ -262,8 +304,19 @@ class Processor(Iface, TProcessor):
     args.read(iprot)
     iprot.readMessageEnd()
     result = PrepareFuture_result()
-    result.success = self._handler.PrepareFuture(args.proposal_number)
+    result.success = self._handler.PrepareFuture(args.instance, args.proposal_number)
     oprot.writeMessageBegin("PrepareFuture", TMessageType.REPLY, seqid)
+    result.write(oprot)
+    oprot.writeMessageEnd()
+    oprot.trans.flush()
+
+  def process_Learn(self, seqid, iprot, oprot):
+    args = Learn_args()
+    args.read(iprot)
+    iprot.readMessageEnd()
+    result = Learn_result()
+    self._handler.Learn(args.instance, args.command)
+    oprot.writeMessageBegin("Learn", TMessageType.REPLY, seqid)
     result.write(oprot)
     oprot.writeMessageEnd()
     oprot.trans.flush()
@@ -657,15 +710,18 @@ class Prepare_result:
 class PrepareFuture_args:
   """
   Attributes:
+   - instance
    - proposal_number
   """
 
   thrift_spec = (
     None, # 0
-    (1, TType.I32, 'proposal_number', None, None, ), # 1
+    (1, TType.I32, 'instance', None, None, ), # 1
+    (2, TType.I32, 'proposal_number', None, None, ), # 2
   )
 
-  def __init__(self, proposal_number=None,):
+  def __init__(self, instance=None, proposal_number=None,):
+    self.instance = instance
     self.proposal_number = proposal_number
 
   def read(self, iprot):
@@ -678,6 +734,11 @@ class PrepareFuture_args:
       if ftype == TType.STOP:
         break
       if fid == 1:
+        if ftype == TType.I32:
+          self.instance = iprot.readI32();
+        else:
+          iprot.skip(ftype)
+      elif fid == 2:
         if ftype == TType.I32:
           self.proposal_number = iprot.readI32();
         else:
@@ -692,8 +753,12 @@ class PrepareFuture_args:
       oprot.trans.write(fastbinary.encode_binary(self, (self.__class__, self.thrift_spec)))
       return
     oprot.writeStructBegin('PrepareFuture_args')
+    if self.instance is not None:
+      oprot.writeFieldBegin('instance', TType.I32, 1)
+      oprot.writeI32(self.instance)
+      oprot.writeFieldEnd()
     if self.proposal_number is not None:
-      oprot.writeFieldBegin('proposal_number', TType.I32, 1)
+      oprot.writeFieldBegin('proposal_number', TType.I32, 2)
       oprot.writeI32(self.proposal_number)
       oprot.writeFieldEnd()
     oprot.writeFieldStop()
@@ -721,7 +786,7 @@ class PrepareFuture_result:
   """
 
   thrift_spec = (
-    (0, TType.STRUCT, 'success', (PrepareResponse, PrepareResponse.thrift_spec), None, ), # 0
+    (0, TType.STRUCT, 'success', (PrepareFutureResponse, PrepareFutureResponse.thrift_spec), None, ), # 0
   )
 
   def __init__(self, success=None,):
@@ -738,7 +803,7 @@ class PrepareFuture_result:
         break
       if fid == 0:
         if ftype == TType.STRUCT:
-          self.success = PrepareResponse()
+          self.success = PrepareFutureResponse()
           self.success.read(iprot)
         else:
           iprot.skip(ftype)
@@ -756,6 +821,120 @@ class PrepareFuture_result:
       oprot.writeFieldBegin('success', TType.STRUCT, 0)
       self.success.write(oprot)
       oprot.writeFieldEnd()
+    oprot.writeFieldStop()
+    oprot.writeStructEnd()
+
+  def validate(self):
+    return
+
+
+  def __repr__(self):
+    L = ['%s=%r' % (key, value)
+      for key, value in self.__dict__.iteritems()]
+    return '%s(%s)' % (self.__class__.__name__, ', '.join(L))
+
+  def __eq__(self, other):
+    return isinstance(other, self.__class__) and self.__dict__ == other.__dict__
+
+  def __ne__(self, other):
+    return not (self == other)
+
+class Learn_args:
+  """
+  Attributes:
+   - instance
+   - command
+  """
+
+  thrift_spec = (
+    None, # 0
+    (1, TType.I32, 'instance', None, None, ), # 1
+    (2, TType.STRING, 'command', None, None, ), # 2
+  )
+
+  def __init__(self, instance=None, command=None,):
+    self.instance = instance
+    self.command = command
+
+  def read(self, iprot):
+    if iprot.__class__ == TBinaryProtocol.TBinaryProtocolAccelerated and isinstance(iprot.trans, TTransport.CReadableTransport) and self.thrift_spec is not None and fastbinary is not None:
+      fastbinary.decode_binary(self, iprot.trans, (self.__class__, self.thrift_spec))
+      return
+    iprot.readStructBegin()
+    while True:
+      (fname, ftype, fid) = iprot.readFieldBegin()
+      if ftype == TType.STOP:
+        break
+      if fid == 1:
+        if ftype == TType.I32:
+          self.instance = iprot.readI32();
+        else:
+          iprot.skip(ftype)
+      elif fid == 2:
+        if ftype == TType.STRING:
+          self.command = iprot.readString();
+        else:
+          iprot.skip(ftype)
+      else:
+        iprot.skip(ftype)
+      iprot.readFieldEnd()
+    iprot.readStructEnd()
+
+  def write(self, oprot):
+    if oprot.__class__ == TBinaryProtocol.TBinaryProtocolAccelerated and self.thrift_spec is not None and fastbinary is not None:
+      oprot.trans.write(fastbinary.encode_binary(self, (self.__class__, self.thrift_spec)))
+      return
+    oprot.writeStructBegin('Learn_args')
+    if self.instance is not None:
+      oprot.writeFieldBegin('instance', TType.I32, 1)
+      oprot.writeI32(self.instance)
+      oprot.writeFieldEnd()
+    if self.command is not None:
+      oprot.writeFieldBegin('command', TType.STRING, 2)
+      oprot.writeString(self.command)
+      oprot.writeFieldEnd()
+    oprot.writeFieldStop()
+    oprot.writeStructEnd()
+
+  def validate(self):
+    return
+
+
+  def __repr__(self):
+    L = ['%s=%r' % (key, value)
+      for key, value in self.__dict__.iteritems()]
+    return '%s(%s)' % (self.__class__.__name__, ', '.join(L))
+
+  def __eq__(self, other):
+    return isinstance(other, self.__class__) and self.__dict__ == other.__dict__
+
+  def __ne__(self, other):
+    return not (self == other)
+
+class Learn_result:
+
+  thrift_spec = (
+  )
+
+  def read(self, iprot):
+    if iprot.__class__ == TBinaryProtocol.TBinaryProtocolAccelerated and isinstance(iprot.trans, TTransport.CReadableTransport) and self.thrift_spec is not None and fastbinary is not None:
+      fastbinary.decode_binary(self, iprot.trans, (self.__class__, self.thrift_spec))
+      return
+    iprot.readStructBegin()
+    while True:
+      (fname, ftype, fid) = iprot.readFieldBegin()
+      if ftype == TType.STOP:
+        break
+      else:
+        iprot.skip(ftype)
+      iprot.readFieldEnd()
+    iprot.readStructEnd()
+
+  def write(self, oprot):
+    if oprot.__class__ == TBinaryProtocol.TBinaryProtocolAccelerated and self.thrift_spec is not None and fastbinary is not None:
+      oprot.trans.write(fastbinary.encode_binary(self, (self.__class__, self.thrift_spec)))
+      return
+    oprot.writeStructBegin('Learn_result')
     oprot.writeFieldStop()
     oprot.writeStructEnd()
 

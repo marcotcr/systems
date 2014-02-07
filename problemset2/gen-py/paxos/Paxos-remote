@@ -26,7 +26,8 @@ if len(sys.argv) <= 1 or sys.argv[1] == '--help':
   print '  bool Ping()'
   print '  i32 Propose(i32 instance, i32 proposal_number, string value)'
   print '  PrepareResponse Prepare(i32 instance, i32 proposal_number)'
-  print '  PrepareResponse PrepareFuture(i32 proposal_number)'
+  print '  PrepareFutureResponse PrepareFuture(i32 instance, i32 proposal_number)'
+  print '  void Learn(i32 instance, string command)'
   print '  void RunCommand(i32 cmd_id, string command)'
   print ''
   sys.exit(0)
@@ -98,10 +99,16 @@ elif cmd == 'Prepare':
   pp.pprint(client.Prepare(eval(args[0]),eval(args[1]),))
 
 elif cmd == 'PrepareFuture':
-  if len(args) != 1:
-    print 'PrepareFuture requires 1 args'
+  if len(args) != 2:
+    print 'PrepareFuture requires 2 args'
     sys.exit(1)
-  pp.pprint(client.PrepareFuture(eval(args[0]),))
+  pp.pprint(client.PrepareFuture(eval(args[0]),eval(args[1]),))
+
+elif cmd == 'Learn':
+  if len(args) != 2:
+    print 'Learn requires 2 args'
+    sys.exit(1)
+  pp.pprint(client.Learn(eval(args[0]),args[1],))
 
 elif cmd == 'RunCommand':
   if len(args) != 2:

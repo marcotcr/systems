@@ -112,3 +112,115 @@ class PrepareResponse:
 
   def __ne__(self, other):
     return not (self == other)
+
+class PrepareFutureResponse:
+  """
+  Attributes:
+   - promised
+   - accepted
+   - values
+   - highest_prepared
+  """
+
+  thrift_spec = (
+    None, # 0
+    (1, TType.BOOL, 'promised', None, None, ), # 1
+    (2, TType.LIST, 'accepted', (TType.I32,None), None, ), # 2
+    (3, TType.LIST, 'values', (TType.STRING,None), None, ), # 3
+    (4, TType.I32, 'highest_prepared', None, None, ), # 4
+  )
+
+  def __init__(self, promised=None, accepted=None, values=None, highest_prepared=None,):
+    self.promised = promised
+    self.accepted = accepted
+    self.values = values
+    self.highest_prepared = highest_prepared
+
+  def read(self, iprot):
+    if iprot.__class__ == TBinaryProtocol.TBinaryProtocolAccelerated and isinstance(iprot.trans, TTransport.CReadableTransport) and self.thrift_spec is not None and fastbinary is not None:
+      fastbinary.decode_binary(self, iprot.trans, (self.__class__, self.thrift_spec))
+      return
+    iprot.readStructBegin()
+    while True:
+      (fname, ftype, fid) = iprot.readFieldBegin()
+      if ftype == TType.STOP:
+        break
+      if fid == 1:
+        if ftype == TType.BOOL:
+          self.promised = iprot.readBool();
+        else:
+          iprot.skip(ftype)
+      elif fid == 2:
+        if ftype == TType.LIST:
+          self.accepted = []
+          (_etype3, _size0) = iprot.readListBegin()
+          for _i4 in xrange(_size0):
+            _elem5 = iprot.readI32();
+            self.accepted.append(_elem5)
+          iprot.readListEnd()
+        else:
+          iprot.skip(ftype)
+      elif fid == 3:
+        if ftype == TType.LIST:
+          self.values = []
+          (_etype9, _size6) = iprot.readListBegin()
+          for _i10 in xrange(_size6):
+            _elem11 = iprot.readString();
+            self.values.append(_elem11)
+          iprot.readListEnd()
+        else:
+          iprot.skip(ftype)
+      elif fid == 4:
+        if ftype == TType.I32:
+          self.highest_prepared = iprot.readI32();
+        else:
+          iprot.skip(ftype)
+      else:
+        iprot.skip(ftype)
+      iprot.readFieldEnd()
+    iprot.readStructEnd()
+
+  def write(self, oprot):
+    if oprot.__class__ == TBinaryProtocol.TBinaryProtocolAccelerated and self.thrift_spec is not None and fastbinary is not None:
+      oprot.trans.write(fastbinary.encode_binary(self, (self.__class__, self.thrift_spec)))
+      return
+    oprot.writeStructBegin('PrepareFutureResponse')
+    if self.promised is not None:
+      oprot.writeFieldBegin('promised', TType.BOOL, 1)
+      oprot.writeBool(self.promised)
+      oprot.writeFieldEnd()
+    if self.accepted is not None:
+      oprot.writeFieldBegin('accepted', TType.LIST, 2)
+      oprot.writeListBegin(TType.I32, len(self.accepted))
+      for iter12 in self.accepted:
+        oprot.writeI32(iter12)
+      oprot.writeListEnd()
+      oprot.writeFieldEnd()
+    if self.values is not None:
+      oprot.writeFieldBegin('values', TType.LIST, 3)
+      oprot.writeListBegin(TType.STRING, len(self.values))
+      for iter13 in self.values:
+        oprot.writeString(iter13)
+      oprot.writeListEnd()
+      oprot.writeFieldEnd()
+    if self.highest_prepared is not None:
+      oprot.writeFieldBegin('highest_prepared', TType.I32, 4)
+      oprot.writeI32(self.highest_prepared)
+      oprot.writeFieldEnd()
+    oprot.writeFieldStop()
+    oprot.writeStructEnd()
+
+  def validate(self):
+    return
+
+
+  def __repr__(self):
+    L = ['%s=%r' % (key, value)
+      for key, value in self.__dict__.iteritems()]
+    return '%s(%s)' % (self.__class__.__name__, ', '.join(L))
+
+  def __eq__(self, other):
+    return isinstance(other, self.__class__) and self.__dict__ == other.__dict__
+
+  def __ne__(self, other):
+    return not (self == other)

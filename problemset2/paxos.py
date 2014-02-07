@@ -24,25 +24,56 @@ class Acceptor:
   def __init__(self):
     self.promised = [None for x in xrange(10000)]
     self.accepted = [None for x in xrange(10000)]
+    self.highest_accepted = -1
+    self.future_promise = (10001, -1)
   def Propose(self, instance, proposal_number, value):
+    if instance >= self.future_promise[0] and proposal_number < self.future_promise[1]:
+      return self.future_promise[1]
     if proposal_number >= self.promised[instance]:
       self.accepted[instance] = value
+      self.highest_accepted = max(self.highest_accepted, instance)
       return 0
     else:
       return self.promised[instance]
 
   def Prepare(self, instance, proposal_number):
     response = PrepareResponse()
-    response.highest_prepared = self.promised[instance]
     if self.accepted[instance]:
       response.highest_accepted_value = self.accepted[instance]
-    if proposal_number > self.promised[instance]:
-      response.promised = True
-      self.promised[instance] = proposal_number
+    if instance >= self.future_promise[0]:
+      if proposal_number > max(self.future_promise[1],self.promised[instance]):
+        response.promised = True
+        self.promised[instance] = proposal_number
+      else:
+        response.promised = False
+        response.highest_prepared = max(self.future_promise[1], self.promised[instance])
     else:
-      response.promised = False
+      response.highest_prepared = self.promised[instance]
+      if proposal_number > self.promised[instance]:
+        response.promised = True
+        self.promised[instance] = proposal_number
+      else:
+        response.promised = False
     response.value_is_chosen = False
     return response
+  def PrepareFuture(self, instance, proposal_number):
+    print 'Prepare Future', instance, proposal_number
+    return_ = PrepareFutureResponse(accepted=[], values=[])
+    if proposal_number < self.future_promise[1]:
+      return_.promised = False
+      return_.highest_prepared = self.future_promise[1]
+      return return_
+    return_.promised = True
+    for i in range(self.future_promise[0], instance):
+      self.promised[i] = self.future_promise[1]
+    self.future_promise = (instance, proposal_number)
+    for i in range(instance, self.highest_accepted + 1):
+      if self.accepted[i]:
+        return_.accepted.append(i)
+        return_.values.append(self.accepted[i])
+    print return_
+    return return_
+
       
 class PaxosHandler:
   def __init__(self, n_locks, my_id, nodes, leader):
@@ -65,6 +96,22 @@ class PaxosHandler:
     print 'pinged'
     return 1
 
+  def Learn(self, instance, cmd):
+    self.commands[instance] = cmd
+    if instance == last_run_command + 1:
+      last_run_command += 1
+      cmd_id, cmd = cmd.split('_')
+      command, mutex, worker = cmd.split(' ')
+      if command == 'noop':
+        pass
+      elif command == 'lock':
+        self.lock_machine.Lock(int(mutex), int(worker))
+      elif command == 'unlock':
+        response = self.lock_machine.Unlock(int(mutex), int(worker))
+        #TODO: Upcall: unlock
+        if response > 0:
+          #TODO: upcall, response now has the lock on mutex
+          pass
   def RunPhase2(self, instance, cmd):
     """Returns 0 if successful, or the number of the highest proposal number
     prepared by any acceptor."""
@@ -94,12 +141,23 @@ class PaxosHandler:
           
   def RunCommand(self, cmd_id, command):
     print 'Run Command', cmd_id, command
+    # TODO: maybe just have cmd here already be cmdid_cmd
     if self.my_id == self.leader:
       #TODO: call runPhase2 with correct instance and cmd id
-      pass
-      # TODO:
-      # 1. accepted: learn it, propagate to everyone else
-      # 2. not accepted: learn new leader. forward this cmd to new leader.
+      chosen = self.RunPhase2(self.last_run_command + 1, cmd_id + "_" + cmd)
+      # This value was chosen
+      if chosen == 0:
+        self.Learn(self.last_run_command + 1, cmd_id+ "_" + cmd)
+        for i in range(self.num_nodes):
+          if i != self.my_id:
+            try:
+              nodes.transports[i].open()
+              nodes.clients[i].Learn(self.last_run_command + 1, cmd_id + "_" + cmd)
+            except:
+              pass
+      else:
+        #TODO: I am not the leader anymore, must learn new leader and etc.
+        pass
     else:
       try:
         self.nodes.transports[self.leader].open()
@@ -125,6 +183,8 @@ class PaxosHandler:
     else:
       response = self.acceptor.Prepare(instance, proposal_number)
     return response
+  def PrepareFuture(self, instance, proposal_number):
+    return self.acceptor.PrepareFuture(instance, proposal_number)
     
 class Nodes:
   def __init__(self, node_list, my_id):
@@ -166,8 +226,8 @@ def main():
   tfactory = TTransport.TBufferedTransportFactory()
   pfactory = TBinaryProtocol.TBinaryProtocolFactory()
   
-  #server = TServer.TSimpleServer(processor, transport, tfactory, pfactory)
-  server = TServer.TThreadedServer(processor, transport, tfactory, pfactory)
+  server = TServer.TSimpleServer(processor, transport, tfactory, pfactory)
+  #server = TServer.TThreadedServer(processor, transport, tfactory, pfactory)
    
    
   print "Starting python server..."
