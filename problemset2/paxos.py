@@ -66,28 +66,40 @@ class PaxosHandler:
     return 1
 
   def RunPhase2(self, instance, cmd):
+    """Returns 0 if successful, or the number of the highest proposal number
+    prepared by any acceptor."""
     nodes = range(self.num_nodes).remove(self.my_id)
-    responses = []
+    # asking my own acceptor
+    responses = [self.acceptor.Propose(self.last_command + 1, self.current_proposal_number * 1000 + self.my_id, cmd)]
     while len(responses) < self.majority:
-      majority = np.random.choice(nodes, size=self.majority, replace=False)
-      for node in majority:
-        if self.nodes.sockets[node].isOpen():
-          try:
-            # This doesnt work with more than 1000 nodes
-            responses.append(self.nodes.clients[node].Propose(self.last_command + 1, self.current_proposal_number * 1000 + self.my_id, cmd))
-          except:
-            pass
-        else:
-          try:
-            self.nodes.transports[node].open()
-          except:
-            pass
+      node = np.random.choice(nodes)
+      try:
+        # This doesnt work with more than 1000 nodes
+        responses.append(self.nodes.clients[node].Propose(self.last_command + 1, self.current_proposal_number * 1000 + self.my_id, cmd))
+        # Whenever a node responds, I can remove it from the list of nodes
+        # to be queried.
+        nodes.remove(node)
+      except:
+        try:
+          self.nodes.transports[node].open()
+        except:
+          pass
+    responses = np.array(responses)    
+    accepts = sum(responses == 0)
+    if accepts >= self.majority:
+      return 0
+    else:
+      return np.max(responses[responses != 0])
 
           
   def RunCommand(self, cmd_id, command):
     print 'Run Command', cmd_id, command
     if self.my_id == self.leader:
+      #TODO: call runPhase2 with correct instance and cmd id
       pass
+      # TODO:
+      # 1. accepted: learn it, propagate to everyone else
+      # 2. not accepted: learn new leader. forward this cmd to new leader.
     else:
       try:
         self.nodes.transports[self.leader].open()
@@ -128,7 +140,10 @@ class Nodes:
       host, port = node.split(':')
       socket = TSocket.TSocket(host, port)
       transport = TTransport.TBufferedTransport(socket)
-      transport.open()
+      try:
+        transport.open()
+      except:
+        pass
       protocol = TBinaryProtocol.TBinaryProtocol(transport)
       client = Paxos.Client(protocol)
       self.transports.append(transport)
