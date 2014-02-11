@@ -25,6 +25,7 @@ class BrokerHandler:
     self.counter_lock = threading.Lock()
     self.locks = [None for x in xrange(n_locks)]
     self.conds = [threading.Condition() for x in xrange(n_locks)]
+    self.queue = [0 for x in xrange(n_locks)]
     self.command_id = 0
 
   def Lock(self, mutex, worker):
@@ -35,8 +36,10 @@ class BrokerHandler:
     self.command_id += 1
     self.counter_lock.release()
     self.conds[mutex].acquire()
-    if self.locks[mutex] != worker:
+    self.queue[mutex] += 1
+    while self.locks[mutex] != worker:
       self.conds[mutex].wait()
+    self.queue[mutex] -= 1
     self.locks[mutex] = None
     self.conds[mutex].release()
 
@@ -51,8 +54,9 @@ class BrokerHandler:
   def GotLock(self, mutex, worker):
     print 'GotLock', mutex, worker
     self.conds[mutex].acquire()
-    self.locks[mutex] = worker
-    self.conds[mutex].notify()
+    if self.queue[mutex] > 0:
+      self.locks[mutex] = worker
+      self.conds[mutex].notify()
     self.conds[mutex].release()
   def Kill(self):
     exit(0)

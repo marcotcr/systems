@@ -112,11 +112,12 @@ class PaxosHandler:
       elif command == 'Lock':
         locked = self.lock_machine.Lock(int(mutex), int(worker))
         print locked, mutex, worker
+        # I only need to do this if my id == node_id
         if locked:
           self.broker.GotLock(int(mutex), int(worker))
       elif command == 'Unlock':
         response = self.lock_machine.Unlock(int(mutex), int(worker))
-        #TODO: Upcall: unlock
+        #TODO: this can only be sent to the broker that locked it in the first place
         if response > 0:
           self.broker.GotLock(int(mutex), response)
   def RunPhase2(self, instance, cmd):
@@ -155,8 +156,7 @@ class PaxosHandler:
     full_command = str(cmd_id) + '_' + str(node_id) + '_' + command
     if self.my_id == self.leader:
       #TODO: call runPhase2 with correct instance and cmd id
-      #chosen = self.RunPhase2(self.last_run_command + 1, full_command)
-      chosen = 0
+      chosen = self.RunPhase2(self.last_run_command + 1, full_command)
       # This value was chosen
       if chosen == 0:
         self.Learn(self.last_run_command + 1, full_command)
