@@ -1,7 +1,3 @@
-# This is a blocking server, except for flush_all and set_multi. If it becomes a bottleneck, we would have to do it
-# in C++, or use threading (even though we have the interpreter lock), or
-# something. For now, I'm planning on using this instead of the single memcached
-# server and see how it performs.
 import sys
 sys.path.append('gen-py/broker')
 sys.path.append('gen-py/')

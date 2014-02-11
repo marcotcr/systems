@@ -93,7 +93,6 @@ class PaxosHandler:
     self.current_proposal_number = 0
     self.last_command = 0
     self.broker = broker
-    pass
  
   def Ping(self):
     print 'pinged'
@@ -123,6 +122,7 @@ class PaxosHandler:
   def RunPhase2(self, instance, cmd):
     """Returns 0 if successful, or the number of the highest proposal number
     prepared by any acceptor."""
+    print 'RunPhase2'
     nodes = range(self.num_nodes).remove(self.my_id)
     # asking my own acceptor
     responses = [self.acceptor.Propose(self.last_command + 1, self.current_proposal_number * 1000 + self.my_id, cmd)]
@@ -151,7 +151,7 @@ class PaxosHandler:
     # Command here is in the form:
     # Lock 1 2
     # Unlock 2 3
-    print 'Run Command', cmd_id, command
+    print 'Run Command', cmd_id, node_id, command
     full_command = str(cmd_id) + '_' + str(node_id) + '_' + command
     if self.my_id == self.leader:
       #TODO: call runPhase2 with correct instance and cmd id
@@ -163,9 +163,11 @@ class PaxosHandler:
         for i in range(self.num_nodes):
           if i != self.my_id:
             try:
-              nodes.transports[i].open()
-              nodes.clients[i].Learn(self.last_run_command + 1, cmd_id + "_" + cmd)
+              self.nodes.transports[i].open()
+              self.nodes.clients[i].Learn(self.last_run_command, full_command)
             except:
+              print sys.exc_info()[0]
+              print 'Exception learning'
               pass
       else:
         #TODO: I am not the leader anymore, must learn new leader and etc.
@@ -173,7 +175,7 @@ class PaxosHandler:
     else:
       try:
         self.nodes.transports[self.leader].open()
-        self.nodes.clients[self.leader].RunCommand(cmd_id, command)
+        self.nodes.clients[self.leader].RunCommand(cmd_id, node_id, command)
       except:
         self.ElectNewLeader()
         #TODO: must still run this command!
@@ -185,8 +187,10 @@ class PaxosHandler:
 
   # This is all other people calling my acceptor.
   def Propose(self, instance, proposal_number, value):
+    print 'Propose'
     return self.acceptor.Propose(instance, proposal_number, value)
   def Prepare(self, instance, proposal_number):
+    print 'Prepare'
     # If this instance already has a chosen value
     if self.commands[instance]:
       response = PrepareResponse()
@@ -235,6 +239,7 @@ class BrokerClient:
     self.client = Broker.Client(protocol)
   def GotLock(self, mutex, worker):
     while True:
+      print 'Trying broker'
       try:
         self.client.GotLock(mutex, worker)
         break
@@ -261,8 +266,8 @@ def main():
   transport = TSocket.TServerSocket(port=port)
   tfactory = TTransport.TBufferedTransportFactory()
   pfactory = TBinaryProtocol.TBinaryProtocolFactory()
-  server = TServer.TSimpleServer(processor, transport, tfactory, pfactory)
-  #server = TServer.TThreadedServer(processor, transport, tfactory, pfactory)
+  #server = TServer.TSimpleServer(processor, transport, tfactory, pfactory)
+  server = TServer.TThreadedServer(processor, transport, tfactory, pfactory)
    
    
   print "Starting python server..."
