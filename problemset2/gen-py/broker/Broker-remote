@@ -8,7 +8,6 @@
 #
 
 import sys
-sys.path.append('gen-py/paxos')
 import pprint
 from urlparse import urlparse
 from thrift.transport import TTransport
@@ -16,20 +15,17 @@ from thrift.transport import TSocket
 from thrift.transport import THttpClient
 from thrift.protocol import TBinaryProtocol
 
-import Paxos
-from ttypes import *
+from broker import Broker
+from broker.ttypes import *
 
 if len(sys.argv) <= 1 or sys.argv[1] == '--help':
   print ''
   print 'Usage: ' + sys.argv[0] + ' [-h host[:port]] [-u url] [-f[ramed]] function [arg1 [arg2...]]'
   print ''
   print 'Functions:'
-  print '  bool Ping()'
-  print '  i32 Propose(i32 instance, i32 proposal_number, string value)'
-  print '  PrepareResponse Prepare(i32 instance, i32 proposal_number)'
-  print '  PrepareFutureResponse PrepareFuture(i32 instance, i32 proposal_number)'
-  print '  void Learn(i32 instance, string command)'
-  print '  void RunCommand(i32 cmd_id, i32 node_id, string command)'
+  print '  void Lock(i32 mutex, i32 worker)'
+  print '  void Unlock(i32 mutex, i32 worker)'
+  print '  void GotLock(i32 mutex, i32 worker)'
   print ''
   sys.exit(0)
 
@@ -78,44 +74,26 @@ else:
   else:
     transport = TTransport.TBufferedTransport(socket)
 protocol = TBinaryProtocol.TBinaryProtocol(transport)
-client = Paxos.Client(protocol)
+client = Broker.Client(protocol)
 transport.open()
 
-if cmd == 'Ping':
-  if len(args) != 0:
-    print 'Ping requires 0 args'
-    sys.exit(1)
-  pp.pprint(client.Ping())
-
-elif cmd == 'Propose':
-  if len(args) != 3:
-    print 'Propose requires 3 args'
-    sys.exit(1)
-  pp.pprint(client.Propose(eval(args[0]),eval(args[1]),args[2],))
-
-elif cmd == 'Prepare':
+if cmd == 'Lock':
   if len(args) != 2:
-    print 'Prepare requires 2 args'
+    print 'Lock requires 2 args'
     sys.exit(1)
-  pp.pprint(client.Prepare(eval(args[0]),eval(args[1]),))
+  pp.pprint(client.Lock(eval(args[0]),eval(args[1]),))
 
-elif cmd == 'PrepareFuture':
+elif cmd == 'Unlock':
   if len(args) != 2:
-    print 'PrepareFuture requires 2 args'
+    print 'Unlock requires 2 args'
     sys.exit(1)
-  pp.pprint(client.PrepareFuture(eval(args[0]),eval(args[1]),))
+  pp.pprint(client.Unlock(eval(args[0]),eval(args[1]),))
 
-elif cmd == 'Learn':
+elif cmd == 'GotLock':
   if len(args) != 2:
-    print 'Learn requires 2 args'
+    print 'GotLock requires 2 args'
     sys.exit(1)
-  pp.pprint(client.Learn(eval(args[0]),args[1],))
-
-elif cmd == 'RunCommand':
-  if len(args) != 3:
-    print 'RunCommand requires 3 args'
-    sys.exit(1)
-  pp.pprint(client.RunCommand(eval(args[0]),eval(args[1]),args[2],))
+  pp.pprint(client.GotLock(eval(args[0]),eval(args[1]),))
 
 else:
   print 'Unrecognized method %s' % cmd

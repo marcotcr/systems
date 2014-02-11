@@ -28,7 +28,7 @@ if len(sys.argv) <= 1 or sys.argv[1] == '--help':
   print '  PrepareResponse Prepare(i32 instance, i32 proposal_number)'
   print '  PrepareFutureResponse PrepareFuture(i32 instance, i32 proposal_number)'
   print '  void Learn(i32 instance, string command)'
-  print '  void RunCommand(i32 cmd_id, string command)'
+  print '  void RunCommand(i32 cmd_id, i32 node_id, string command)'
   print ''
   sys.exit(0)
 
@@ -111,10 +111,10 @@ elif cmd == 'Learn':
   pp.pprint(client.Learn(eval(args[0]),args[1],))
 
 elif cmd == 'RunCommand':
-  if len(args) != 2:
-    print 'RunCommand requires 2 args'
+  if len(args) != 3:
+    print 'RunCommand requires 3 args'
     sys.exit(1)
-  pp.pprint(client.RunCommand(eval(args[0]),args[1],))
+  pp.pprint(client.RunCommand(eval(args[0]),eval(args[1]),args[2],))
 
 else:
   print 'Unrecognized method %s' % cmd

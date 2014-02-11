@@ -54,10 +54,11 @@ class Iface:
     """
     pass
 
-  def RunCommand(self, cmd_id, command):
+  def RunCommand(self, cmd_id, node_id, command):
     """
     Parameters:
      - cmd_id
+     - node_id
      - command
     """
     pass
@@ -223,18 +224,20 @@ class Client(Iface):
     self._iprot.readMessageEnd()
     return
 
-  def RunCommand(self, cmd_id, command):
+  def RunCommand(self, cmd_id, node_id, command):
     """
     Parameters:
      - cmd_id
+     - node_id
      - command
     """
-    self.send_RunCommand(cmd_id, command)
+    self.send_RunCommand(cmd_id, node_id, command)
 
-  def send_RunCommand(self, cmd_id, command):
+  def send_RunCommand(self, cmd_id, node_id, command):
     self._oprot.writeMessageBegin('RunCommand', TMessageType.CALL, self._seqid)
     args = RunCommand_args()
     args.cmd_id = cmd_id
+    args.node_id = node_id
     args.command = command
     args.write(self._oprot)
     self._oprot.writeMessageEnd()
@@ -325,7 +328,7 @@ class Processor(Iface, TProcessor):
     args = RunCommand_args()
     args.read(iprot)
     iprot.readMessageEnd()
-    self._handler.RunCommand(args.cmd_id, args.command)
+    self._handler.RunCommand(args.cmd_id, args.node_id, args.command)
     return
 
 
@@ -957,17 +960,20 @@ class RunCommand_args:
   """
   Attributes:
    - cmd_id
+   - node_id
    - command
   """
 
   thrift_spec = (
     None, # 0
     (1, TType.I32, 'cmd_id', None, None, ), # 1
-    (2, TType.STRING, 'command', None, None, ), # 2
+    (2, TType.I32, 'node_id', None, None, ), # 2
+    (3, TType.STRING, 'command', None, None, ), # 3
   )
 
-  def __init__(self, cmd_id=None, command=None,):
+  def __init__(self, cmd_id=None, node_id=None, command=None,):
     self.cmd_id = cmd_id
+    self.node_id = node_id
     self.command = command
 
   def read(self, iprot):
@@ -985,6 +991,11 @@ class RunCommand_args:
         else:
           iprot.skip(ftype)
       elif fid == 2:
+        if ftype == TType.I32:
+          self.node_id = iprot.readI32();
+        else:
+          iprot.skip(ftype)
+      elif fid == 3:
         if ftype == TType.STRING:
           self.command = iprot.readString();
         else:
@@ -1003,8 +1014,12 @@ class RunCommand_args:
       oprot.writeFieldBegin('cmd_id', TType.I32, 1)
       oprot.writeI32(self.cmd_id)
       oprot.writeFieldEnd()
+    if self.node_id is not None:
+      oprot.writeFieldBegin('node_id', TType.I32, 2)
+      oprot.writeI32(self.node_id)
+      oprot.writeFieldEnd()
     if self.command is not None:
-      oprot.writeFieldBegin('command', TType.STRING, 2)
+      oprot.writeFieldBegin('command', TType.STRING, 3)
       oprot.writeString(self.command)
       oprot.writeFieldEnd()
     oprot.writeFieldStop()

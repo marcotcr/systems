@@ -100,12 +100,14 @@ class PaxosHandler:
     self.commands[instance] = cmd
     if instance == last_run_command + 1:
       last_run_command += 1
-      cmd_id, cmd = cmd.split('_')
+      cmd_id, node_id, cmd = cmd.split('_')
+      node_id = int(node_id)
+      cmd_id = int(cmd_id)
       command, mutex, worker = cmd.split(' ')
       if command == 'noop':
         pass
       elif command == 'lock':
-        self.lock_machine.Lock(int(mutex), int(worker))
+        locked = self.lock_machine.Lock(int(mutex), int(worker))
       elif command == 'unlock':
         response = self.lock_machine.Unlock(int(mutex), int(worker))
         #TODO: Upcall: unlock
@@ -139,15 +141,18 @@ class PaxosHandler:
       return np.max(responses[responses != 0])
 
           
-  def RunCommand(self, cmd_id, command):
+  def RunCommand(self, cmd_id, node_id, command):
+    # Command here is in the form:
+    # Lock 1 2
+    # Unlock 2 3
     print 'Run Command', cmd_id, command
-    # TODO: maybe just have cmd here already be cmdid_cmd
+    full_command = str(cmd_id) + '_' + str(node_id) + '_' + command
     if self.my_id == self.leader:
       #TODO: call runPhase2 with correct instance and cmd id
-      chosen = self.RunPhase2(self.last_run_command + 1, cmd_id + "_" + cmd)
+      chosen = self.RunPhase2(self.last_run_command + 1, full_command)
       # This value was chosen
       if chosen == 0:
-        self.Learn(self.last_run_command + 1, cmd_id+ "_" + cmd)
+        self.Learn(self.last_run_command + 1, full_command)
         for i in range(self.num_nodes):
           if i != self.my_id:
             try:
