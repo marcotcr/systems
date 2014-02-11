@@ -53,10 +53,13 @@ class BrokerHandler:
     self.counter_lock.release()
 
   def GotLock(self, mutex, worker):
+    print 'GotLock', mutex, worker
     self.conds[mutex].acquire()
     self.locks[mutex] = worker
     self.conds[mutex].notify()
     self.conds[mutex].release()
+  def Kill(self):
+    exit(0)
     
 class PaxosClient:
   """Encapsulates paxos client"""

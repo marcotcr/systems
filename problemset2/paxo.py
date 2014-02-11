@@ -3,9 +3,11 @@
 # something. For now, I'm planning on using this instead of the single memcached
 # server and see how it performs.
 import sys
+sys.path.append('gen-py')
 sys.path.append('gen-py/paxos')
  
 import Paxos
+from broker import Broker
 from ttypes import *
  
 from thrift.transport import TSocket
@@ -76,7 +78,7 @@ class Acceptor:
 
       
 class PaxosHandler:
-  def __init__(self, n_locks, my_id, nodes, leader):
+  def __init__(self, n_locks, my_id, nodes, leader, broker):
   # TODO: init from log file
     # TODO: think about this
     self.commands = [None for x in xrange(10000)]
@@ -90,6 +92,7 @@ class PaxosHandler:
     self.majority = int(np.floor(self.num_nodes / 2)) + 1
     self.current_proposal_number = 0
     self.last_command = 0
+    self.broker = broker
     pass
  
   def Ping(self):
@@ -97,23 +100,26 @@ class PaxosHandler:
     return 1
 
   def Learn(self, instance, cmd):
+    print 'Learn', instance, cmd
     self.commands[instance] = cmd
-    if instance == last_run_command + 1:
-      last_run_command += 1
+    if instance == self.last_run_command + 1:
+      self.last_run_command += 1
       cmd_id, node_id, cmd = cmd.split('_')
       node_id = int(node_id)
       cmd_id = int(cmd_id)
       command, mutex, worker = cmd.split(' ')
       if command == 'noop':
         pass
-      elif command == 'lock':
+      elif command == 'Lock':
         locked = self.lock_machine.Lock(int(mutex), int(worker))
-      elif command == 'unlock':
+        print locked, mutex, worker
+        if locked:
+          self.broker.GotLock(int(mutex), int(worker))
+      elif command == 'Unlock':
         response = self.lock_machine.Unlock(int(mutex), int(worker))
         #TODO: Upcall: unlock
         if response > 0:
-          #TODO: upcall, response now has the lock on mutex
-          pass
+          self.broker.GotLock(int(mutex), response)
   def RunPhase2(self, instance, cmd):
     """Returns 0 if successful, or the number of the highest proposal number
     prepared by any acceptor."""
@@ -149,7 +155,8 @@ class PaxosHandler:
     full_command = str(cmd_id) + '_' + str(node_id) + '_' + command
     if self.my_id == self.leader:
       #TODO: call runPhase2 with correct instance and cmd id
-      chosen = self.RunPhase2(self.last_run_command + 1, full_command)
+      #chosen = self.RunPhase2(self.last_run_command + 1, full_command)
+      chosen = 0
       # This value was chosen
       if chosen == 0:
         self.Learn(self.last_run_command + 1, full_command)
@@ -215,22 +222,45 @@ class Nodes:
       self.clients.append(client)
       self.sockets.append(socket)
 
+class BrokerClient:
+  """Encapsulates paxos client"""
+  def __init__(self, host, port):
+    socket = TSocket.TSocket(host, port)
+    self.transport = TTransport.TBufferedTransport(socket)
+    try:
+      self.transport.open()
+    except:
+      pass
+    protocol = TBinaryProtocol.TBinaryProtocol(self.transport)
+    self.client = Broker.Client(protocol)
+  def GotLock(self, mutex, worker):
+    while True:
+      try:
+        self.client.GotLock(mutex, worker)
+        break
+      except:
+        self.transport.open()
+
 def main():
   parser = argparse.ArgumentParser(description='TODO')
   parser.add_argument('-l', '--num_locks', dest='n_locks', required=True, help="Number of mutexes available", type=int)
   parser.add_argument('-i', '--my_id', type=int, required=True, help="This machine's ID (must be integer)")
   parser.add_argument('-n', '--nodes', required=True, dest='nodes', nargs = '+', help="all nodes in the form ip:port")
+  parser.add_argument('-b', '--broker', required=True, help="broker handler's ip:port")
   # parser.add_argument('-e', '--error', default=0, type=float, dest='error', help="desired error rate")
   # parser.add_argument('-o', '--output', default='/dev/null', dest='output', help="output file, saving progress")
   args = parser.parse_args()
   nodes = Nodes(args.nodes, args.my_id) 
   port = int(args.nodes[args.my_id].split(':')[1])
-  handler = PaxosHandler(args.n_locks, args.my_id, nodes, 0)
+
+  broker_host, broker_port = args.broker.split(':')
+  broker = BrokerClient(broker_host, int(broker_port))
+
+  handler = PaxosHandler(args.n_locks, args.my_id, nodes, 0, broker)
   processor = Paxos.Processor(handler)
   transport = TSocket.TServerSocket(port=port)
   tfactory = TTransport.TBufferedTransportFactory()
   pfactory = TBinaryProtocol.TBinaryProtocolFactory()
-  
   server = TServer.TSimpleServer(processor, transport, tfactory, pfactory)
   #server = TServer.TThreadedServer(processor, transport, tfactory, pfactory)
    

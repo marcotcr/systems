@@ -12,7 +12,7 @@ class LockMachine:
     self.waiting = [[] for x in xrange(n)]
   def Lock(self, mutex, worker):
     """Returns True if lock was acquired, False otherwise"""
-    if self.mutexes[mutex]:
+    if self.mutexes[mutex] != None:
       self.waiting[mutex].append(worker)
       return False
     else:
