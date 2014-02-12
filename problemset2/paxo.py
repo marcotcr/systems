@@ -200,26 +200,53 @@ class PaxosHandler:
           self.nodes.clients[self.leader].RunCommand(cmd_id, node_id, command)
           to_continue = false
         except:
-          self.ElectNewLeader()
+          self.ElectNewLeader(self.leader + 1)
+          for i in range(self.num_nodes):
+            if i != self.my_id:
+              try:
+                self.nodes.transports[i].open()
+                self.nodes.clients[i].ElectNewLeader(self.leader)
+              except:
+                pass
           #TODO: must still run this command!
+          #Shrainik: the while loop should take care of this.
     pass
     
-  def ElectNewLeader(self):
+  def ElectNewLeader(self, new_leader):
     print 'ElectNewLeader'
-    self.leader += 1
-    for i in range(self.num_nodes):
-      try:
-        self.nodes.transports[i].open()
-        #TODO: need to check the return value. if false, prepare with a higher number.
-        self.nodes.clients[i].PrepareFuture(self.last_command, (self.current_proposal_number+1) * 1000 + self.my_id)
-      except:
-        pass
+    if (new_leader != self.leader):
+      self.leader = new_leader
+      sleep(1)
+    if self.leader == self.my_id:
+      #Prepare everything not yet run.
+      for i in range(self.last_run_command+1, self.last_command):
+        for j in range(self.num_nodes):
+          if j == self.my_id:
+            self.Prepare(i, self.current_proposal_number + 1)
+          else
+            try:
+                self.nodes.transports[i].open()
+                self.nodes.clients[i].Prepare(i, self.current_proposal_number + 1)
+              except:
+                pass
+      #PrepareFuture everything yet to run.
+      for i in range(self.last_command, 10000):
+        for j in range(self.num_nodes):
+          if j == self.my_id:
+            self.PrepareFuture(i, self.current_proposal_number + 1)
+          else
+            try:
+                self.nodes.transports[i].open()
+                self.nodes.clients[i].PrepareFuture(i, self.current_proposal_number + 1)
+              except:
+                pass
     pass
 
   # This is all other people calling my acceptor.
   def Propose(self, instance, proposal_number, value):
     print 'Propose'
     return self.acceptor.Propose(instance, proposal_number, value)
+
   def Prepare(self, instance, proposal_number):
     print 'Prepare'
     # If this instance already has a chosen value
@@ -230,6 +257,7 @@ class PaxosHandler:
     else:
       response = self.acceptor.Prepare(instance, proposal_number)
     return response
+
   def PrepareFuture(self, instance, proposal_number):
     return self.acceptor.PrepareFuture(instance, proposal_number)
 
