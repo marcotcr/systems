@@ -218,8 +218,8 @@ class PaxosHandler:
       self.leader = new_leader
       sleep(1)
     if self.leader == self.my_id:
-      #Prepare everything.
-      for i in range(self.last_run_command+1, self.last_command-1):
+      #Prepare everything not yet run.
+      for i in range(self.last_run_command+1, self.last_command):
         for j in range(self.num_nodes):
           if j == self.my_id:
             self.Prepare(i, self.current_proposal_number + 1)
@@ -229,8 +229,8 @@ class PaxosHandler:
                 self.nodes.clients[i].Prepare(i, self.current_proposal_number + 1)
               except:
                 pass
-      
-      for i in range(self.last_command+1, 10000):
+      #PrepareFuture everything yet to run.
+      for i in range(self.last_command, 10000):
         for j in range(self.num_nodes):
           if j == self.my_id:
             self.PrepareFuture(i, self.current_proposal_number + 1)
