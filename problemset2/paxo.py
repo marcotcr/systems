@@ -96,6 +96,7 @@ class PaxosHandler:
  
   def Ping(self):
     print 'pinged'
+    sys.stdout.flush()
     return 1
 
   def Learn(self, instance, cmd):
@@ -124,7 +125,8 @@ class PaxosHandler:
     """Returns 0 if successful, or the number of the highest proposal number
     prepared by any acceptor."""
     print 'RunPhase2'
-    nodes = range(self.num_nodes).remove(self.my_id)
+    nodes = range(self.num_nodes)
+    nodes.remove(self.my_id)
     # asking my own acceptor
     responses = [self.acceptor.Propose(self.last_command + 1, self.current_proposal_number * 1000 + self.my_id, cmd)]
     while len(responses) < self.majority:
@@ -255,6 +257,9 @@ def main():
   # parser.add_argument('-e', '--error', default=0, type=float, dest='error', help="desired error rate")
   # parser.add_argument('-o', '--output', default='/dev/null', dest='output', help="output file, saving progress")
   args = parser.parse_args()
+  if len(args.nodes) < 3:
+    print 'We need at least three nodes to run'
+    quit()
   nodes = Nodes(args.nodes, args.my_id) 
   port = int(args.nodes[args.my_id].split(':')[1])
 
