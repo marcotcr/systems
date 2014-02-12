@@ -24,10 +24,11 @@ import numpy as np
 
 class Acceptor:
   def __init__(self):
-    self.promised = [None for x in xrange(10000)]
-    self.accepted = [None for x in xrange(10000)]
-    self.highest_accepted = -1
+    self.promised = [None for x in xrange(10000)] # proposal_number promised (indexed by instance numbers) 
+    self.accepted = [None for x in xrange(10000)] # values indexed by instance numbers
+    self.highest_accepted = -1 #highest instance_number for which the a value has been accepted. 
     self.future_promise = (10001, -1)
+  
   def Propose(self, instance, proposal_number, value):
     if instance >= self.future_promise[0] and proposal_number < self.future_promise[1]:
       return self.future_promise[1]
@@ -58,6 +59,7 @@ class Acceptor:
         response.promised = False
     response.value_is_chosen = False
     return response
+  
   def PrepareFuture(self, instance, proposal_number):
     print 'Prepare Future', instance, proposal_number
     return_ = PrepareFutureResponse(accepted=[], values=[])
@@ -79,7 +81,8 @@ class Acceptor:
       
 class PaxosHandler:
   def __init__(self, n_locks, my_id, nodes, leader, broker):
-  # TODO: init from log file
+    # TODO: init from log file
+    # Shrainik: We dont need to implement recovery for this assignment. as per catalyst.
     # TODO: think about this
     self.commands = [None for x in xrange(10000)]
     self.last_run_command = -1
@@ -93,7 +96,7 @@ class PaxosHandler:
     self.current_proposal_number = 0
     self.last_command = 0
     self.broker = broker
- 
+
   def Ping(self):
     print 'pinged'
     sys.stdout.flush()
@@ -121,6 +124,7 @@ class PaxosHandler:
         #TODO: this can only be sent to the broker that locked it in the first place
         if response > 0:
           self.broker.GotLock(int(mutex), response)
+  
   def RunPhase2(self, instance, cmd):
     """Returns 0 if successful, or the number of the highest proposal number
     prepared by any acceptor."""
@@ -148,7 +152,6 @@ class PaxosHandler:
       return 0
     else:
       return np.max(responses[responses != 0])
-
           
   def RunCommand(self, cmd_id, node_id, command):
     # Command here is in the form:
@@ -172,19 +175,45 @@ class PaxosHandler:
               print 'Exception learning'
               pass
       else:
-        #TODO: I am not the leader anymore, must learn new leader and etc.
-        pass
+        #TODO: I am not the leader anymore, must learn new leader and etc. 
+        #Shrainik: Just update  self.leader to ++ and ask him to run the command. 
+        #If that guy is down try the next one, until we find someone who is up. 
+        #that node will either run the command, or send it to the leader. 
+        #liveness is gauranteed.
+
+        to_continue = true
+        assumed_leader = self.leader + 1
+        while to_continue:
+          try:
+            self.nodes.transports[assumed_leader].open()
+            self.nodes.clients[assumed_leader].RunCommand(cmd_id, node_id, command)
+            self.leader = assumed_leader
+            to_continue = false
+          except:
+            assumed_leader += 1
+            pass
     else:
-      try:
-        self.nodes.transports[self.leader].open()
-        self.nodes.clients[self.leader].RunCommand(cmd_id, node_id, command)
-      except:
-        self.ElectNewLeader()
-        #TODO: must still run this command!
+      to_continue = true
+      while to_continue:
+        try:
+          self.nodes.transports[self.leader].open()
+          self.nodes.clients[self.leader].RunCommand(cmd_id, node_id, command)
+          to_continue = false
+        except:
+          self.ElectNewLeader()
+          #TODO: must still run this command!
     pass
     
   def ElectNewLeader(self):
     print 'ElectNewLeader'
+    self.leader += 1
+    for i in range(self.num_nodes):
+      try:
+        self.nodes.transports[i].open()
+        #TODO: need to check the return value. if false, prepare with a higher number.
+        self.nodes.clients[i].PrepareFuture(self.last_command, (self.current_proposal_number+1) * 1000 + self.my_id)
+      except:
+        pass
     pass
 
   # This is all other people calling my acceptor.
@@ -203,6 +232,7 @@ class PaxosHandler:
     return response
   def PrepareFuture(self, instance, proposal_number):
     return self.acceptor.PrepareFuture(instance, proposal_number)
+
     
 class Nodes:
   def __init__(self, node_list, my_id):
@@ -239,6 +269,7 @@ class BrokerClient:
       pass
     protocol = TBinaryProtocol.TBinaryProtocol(self.transport)
     self.client = Broker.Client(protocol)
+
   def GotLock(self, mutex, worker):
     while True:
       print 'Trying broker'
@@ -247,6 +278,7 @@ class BrokerClient:
         break
       except:
         self.transport.open()
+
 
 def main():
   parser = argparse.ArgumentParser(description='TODO')
@@ -273,10 +305,11 @@ def main():
   pfactory = TBinaryProtocol.TBinaryProtocolFactory()
   #server = TServer.TSimpleServer(processor, transport, tfactory, pfactory)
   server = TServer.TThreadedServer(processor, transport, tfactory, pfactory)
-   
-   
+
   print "Starting python server..."
   server.serve()
   print "done!"
+
+
 if __name__ == '__main__':
   main()
