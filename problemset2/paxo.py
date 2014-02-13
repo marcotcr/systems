@@ -174,7 +174,7 @@ class PaxosHandler:
         # Whenever a node responds, I can remove it from the list of nodes
         # to be queried.
         nodes.remove(node)
-     except:
+      except:
         try:
           self.nodes.transports[node].open()
         except:
@@ -241,28 +241,28 @@ class PaxosHandler:
           # Whenever a node responds, I can remove it from the list of nodes
           # to be queried.
           nodes.remove(node)
-       except:
+        except:
           try:
             self.nodes.transports[node].open()
           except:
             pass
-     promised = [x.promised for x in responses] 
-     # If I'm not able to become the new leader, learn who it is.
-     if sum(promised) < self.majority:
-       self.FigureNewLeader(self.last_run_command + 1)
-     else:
-       accepted_count = collections.defaultdict(lambda:0)
-       value_to_propose = {}
-       for response in responses:
-         for i in range(len(response.accepted)):
-           accepted_count[response.accepted[i]] += 1
-           value_to_propose[response.accepted[i]] = response.values[i]
-       for instance,count  in accepted_count.iteritems():
-         if count >= self.majority:
-           self.Learn(instance, value_to_propose[instance])  
-         else:
-           cmd_id, node_id, command = value_to_propose[instance].split('_')
-           self.RunCommand(cmd_id, node_id, command)
+      promised = [x.promised for x in responses] 
+      # If I'm not able to become the new leader, learn who it is.
+      if sum(promised) < self.majority:
+        self.FigureNewLeader(self.last_run_command + 1)
+      else:
+        accepted_count = collections.defaultdict(lambda:0)
+        value_to_propose = {}
+        for response in responses:
+          for i in range(len(response.accepted)):
+            accepted_count[response.accepted[i]] += 1
+            value_to_propose[response.accepted[i]] = response.values[i]
+        for instance,count  in accepted_count.iteritems():
+          if count >= self.majority:
+            self.Learn(instance, value_to_propose[instance])  
+          else:
+            cmd_id, node_id, command = value_to_propose[instance].split('_')
+            self.RunCommand(cmd_id, node_id, command)
         
 
   # This is all other people calling my acceptor.
