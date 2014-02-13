@@ -30,6 +30,7 @@ if len(sys.argv) <= 1 or sys.argv[1] == '--help':
   print '  void Learn(i32 instance, string command)'
   print '  void RunCommand(i32 cmd_id, i32 node_id, string command)'
   print '  void ElectNewLeader(i32 new_leader)'
+  print '  void Kill()'
   print ''
   sys.exit(0)
 
@@ -122,6 +123,12 @@ elif cmd == 'ElectNewLeader':
     print 'ElectNewLeader requires 1 args'
     sys.exit(1)
   pp.pprint(client.ElectNewLeader(eval(args[0]),))
+
+elif cmd == 'Kill':
+  if len(args) != 0:
+    print 'Kill requires 0 args'
+    sys.exit(1)
+  pp.pprint(client.Kill())
 
 else:
   print 'Unrecognized method %s' % cmd

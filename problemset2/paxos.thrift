@@ -19,5 +19,6 @@ service Paxos {
   PrepareFutureResponse PrepareFuture(1:i32 instance, 2:i32 proposal_number),
   void Learn(1:i32 instance, 2:string command),
   oneway void RunCommand(1:i32 cmd_id, 2:i32 node_id, 3:string command),
-  void ElectNewLeader(1:i32 new_leader) 
+  void ElectNewLeader(1:i32 new_leader),
+  void Kill()
 }

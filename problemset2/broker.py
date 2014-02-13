@@ -31,6 +31,7 @@ class BrokerHandler:
   def Lock(self, mutex, worker):
     cmd = 'Lock %d %d' % (mutex, worker)
     print self.command_id, self.my_id, cmd
+    sys.stdout.flush()
     self.counter_lock.acquire()
     self.paxos.RunCommand(self.command_id, self.my_id, cmd)
     self.command_id += 1
@@ -46,6 +47,7 @@ class BrokerHandler:
   def Unlock(self, mutex, worker):
     cmd = 'Unlock %d %d' % (mutex, worker)
     print self.command_id, self.my_id, cmd
+    sys.stdout.flush()
     self.counter_lock.acquire()
     self.paxos.RunCommand(self.command_id, self.my_id, cmd)
     self.command_id += 1
@@ -53,6 +55,7 @@ class BrokerHandler:
 
   def GotLock(self, mutex, worker):
     print 'GotLock', mutex, worker
+    sys.stdout.flush()
     self.conds[mutex].acquire()
     if self.queue[mutex] > 0:
       self.locks[mutex] = worker

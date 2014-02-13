@@ -20,6 +20,7 @@ import time
 import lock_machine
 import argparse
 import numpy as np
+import os
  
 
 class Acceptor:
@@ -97,6 +98,10 @@ class PaxosHandler:
     self.last_command = 0
     self.broker = broker
 
+  def Kill(self):
+    print 'Kill'
+    sys.stdout.flush()
+    os._exit(0)
   def Ping(self):
     print 'pinged'
     sys.stdout.flush()
@@ -123,6 +128,7 @@ class PaxosHandler:
           self.broker.GotLock(int(mutex), int(worker))
       elif command == 'Unlock':
         response = self.lock_machine.Unlock(int(mutex), int(worker))
+        print 'Unlock got response', response
         #TODO: this can only be sent to the broker that locked it in the first place
         if response > 0:
           self.broker.GotLock(int(mutex), response)

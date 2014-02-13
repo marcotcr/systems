@@ -124,6 +124,11 @@ elif cmd == 'ElectNewLeader':
     sys.exit(1)
   pp.pprint(client.ElectNewLeader(eval(args[0]),))
 
+elif cmd == 'Kill':
+  if len(args) != 0:
+    print 'Kill requires 0 args'
+    sys.exit(1)
+  pp.pprint(client.Kill())
 else:
   print 'Unrecognized method %s' % cmd
   sys.exit(1)
