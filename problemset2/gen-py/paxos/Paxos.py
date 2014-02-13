@@ -63,6 +63,13 @@ class Iface:
     """
     pass
 
+  def ElectNewLeader(self, new_leader):
+    """
+    Parameters:
+     - new_leader
+    """
+    pass
+
 
 class Client(Iface):
   def __init__(self, iprot, oprot=None):
@@ -242,6 +249,34 @@ class Client(Iface):
     args.write(self._oprot)
     self._oprot.writeMessageEnd()
     self._oprot.trans.flush()
+  def ElectNewLeader(self, new_leader):
+    """
+    Parameters:
+     - new_leader
+    """
+    self.send_ElectNewLeader(new_leader)
+    self.recv_ElectNewLeader()
+
+  def send_ElectNewLeader(self, new_leader):
+    self._oprot.writeMessageBegin('ElectNewLeader', TMessageType.CALL, self._seqid)
+    args = ElectNewLeader_args()
+    args.new_leader = new_leader
+    args.write(self._oprot)
+    self._oprot.writeMessageEnd()
+    self._oprot.trans.flush()
+
+  def recv_ElectNewLeader(self):
+    (fname, mtype, rseqid) = self._iprot.readMessageBegin()
+    if mtype == TMessageType.EXCEPTION:
+      x = TApplicationException()
+      x.read(self._iprot)
+      self._iprot.readMessageEnd()
+      raise x
+    result = ElectNewLeader_result()
+    result.read(self._iprot)
+    self._iprot.readMessageEnd()
+    return
+
 
 class Processor(Iface, TProcessor):
   def __init__(self, handler):
@@ -253,6 +288,7 @@ class Processor(Iface, TProcessor):
     self._processMap["PrepareFuture"] = Processor.process_PrepareFuture
     self._processMap["Learn"] = Processor.process_Learn
     self._processMap["RunCommand"] = Processor.process_RunCommand
+    self._processMap["ElectNewLeader"] = Processor.process_ElectNewLeader
 
   def process(self, iprot, oprot):
     (name, type, seqid) = iprot.readMessageBegin()
@@ -330,6 +366,17 @@ class Processor(Iface, TProcessor):
     iprot.readMessageEnd()
     self._handler.RunCommand(args.cmd_id, args.node_id, args.command)
     return
+
+  def process_ElectNewLeader(self, seqid, iprot, oprot):
+    args = ElectNewLeader_args()
+    args.read(iprot)
+    iprot.readMessageEnd()
+    result = ElectNewLeader_result()
+    self._handler.ElectNewLeader(args.new_leader)
+    oprot.writeMessageBegin("ElectNewLeader", TMessageType.REPLY, seqid)
+    result.write(oprot)
+    oprot.writeMessageEnd()
+    oprot.trans.flush()
 
 
 # HELPER FUNCTIONS AND STRUCTURES
@@ -1022,6 +1069,108 @@ class RunCommand_args:
       oprot.writeFieldBegin('command', TType.STRING, 3)
       oprot.writeString(self.command)
       oprot.writeFieldEnd()
+    oprot.writeFieldStop()
+    oprot.writeStructEnd()
+
+  def validate(self):
+    return
+
+
+  def __repr__(self):
+    L = ['%s=%r' % (key, value)
+      for key, value in self.__dict__.iteritems()]
+    return '%s(%s)' % (self.__class__.__name__, ', '.join(L))
+
+  def __eq__(self, other):
+    return isinstance(other, self.__class__) and self.__dict__ == other.__dict__
+
+  def __ne__(self, other):
+    return not (self == other)
+
+class ElectNewLeader_args:
+  """
+  Attributes:
+   - new_leader
+  """
+
+  thrift_spec = (
+    None, # 0
+    (1, TType.I32, 'new_leader', None, None, ), # 1
+  )
+
+  def __init__(self, new_leader=None,):
+    self.new_leader = new_leader
+
+  def read(self, iprot):
+    if iprot.__class__ == TBinaryProtocol.TBinaryProtocolAccelerated and isinstance(iprot.trans, TTransport.CReadableTransport) and self.thrift_spec is not None and fastbinary is not None:
+      fastbinary.decode_binary(self, iprot.trans, (self.__class__, self.thrift_spec))
+      return
+    iprot.readStructBegin()
+    while True:
+      (fname, ftype, fid) = iprot.readFieldBegin()
+      if ftype == TType.STOP:
+        break
+      if fid == 1:
+        if ftype == TType.I32:
+          self.new_leader = iprot.readI32();
+        else:
+          iprot.skip(ftype)
+      else:
+        iprot.skip(ftype)
+      iprot.readFieldEnd()
+    iprot.readStructEnd()
+
+  def write(self, oprot):
+    if oprot.__class__ == TBinaryProtocol.TBinaryProtocolAccelerated and self.thrift_spec is not None and fastbinary is not None:
+      oprot.trans.write(fastbinary.encode_binary(self, (self.__class__, self.thrift_spec)))
+      return
+    oprot.writeStructBegin('ElectNewLeader_args')
+    if self.new_leader is not None:
+      oprot.writeFieldBegin('new_leader', TType.I32, 1)
+      oprot.writeI32(self.new_leader)
+      oprot.writeFieldEnd()
+    oprot.writeFieldStop()
+    oprot.writeStructEnd()
+
+  def validate(self):
+    return
+
+
+  def __repr__(self):
+    L = ['%s=%r' % (key, value)
+      for key, value in self.__dict__.iteritems()]
+    return '%s(%s)' % (self.__class__.__name__, ', '.join(L))
+
+  def __eq__(self, other):
+    return isinstance(other, self.__class__) and self.__dict__ == other.__dict__
+
+  def __ne__(self, other):
+    return not (self == other)
+
+class ElectNewLeader_result:
+
+  thrift_spec = (
+  )
+
+  def read(self, iprot):
+    if iprot.__class__ == TBinaryProtocol.TBinaryProtocolAccelerated and isinstance(iprot.trans, TTransport.CReadableTransport) and self.thrift_spec is not None and fastbinary is not None:
+      fastbinary.decode_binary(self, iprot.trans, (self.__class__, self.thrift_spec))
+      return
+    iprot.readStructBegin()
+    while True:
+      (fname, ftype, fid) = iprot.readFieldBegin()
+      if ftype == TType.STOP:
+        break
+      else:
+        iprot.skip(ftype)
+      iprot.readFieldEnd()
+    iprot.readStructEnd()
+
+  def write(self, oprot):
+    if oprot.__class__ == TBinaryProtocol.TBinaryProtocolAccelerated and self.thrift_spec is not None and fastbinary is not None:
+      oprot.trans.write(fastbinary.encode_binary(self, (self.__class__, self.thrift_spec)))
+      return
+    oprot.writeStructBegin('ElectNewLeader_result')
     oprot.writeFieldStop()
     oprot.writeStructEnd()
 

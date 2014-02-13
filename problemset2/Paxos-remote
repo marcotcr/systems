@@ -30,6 +30,7 @@ if len(sys.argv) <= 1 or sys.argv[1] == '--help':
   print '  PrepareFutureResponse PrepareFuture(i32 instance, i32 proposal_number)'
   print '  void Learn(i32 instance, string command)'
   print '  void RunCommand(i32 cmd_id, i32 node_id, string command)'
+  print '  void ElectNewLeader(i32 new_leader)'
   print ''
   sys.exit(0)
 
@@ -116,6 +117,12 @@ elif cmd == 'RunCommand':
     print 'RunCommand requires 3 args'
     sys.exit(1)
   pp.pprint(client.RunCommand(eval(args[0]),eval(args[1]),args[2],))
+
+elif cmd == 'ElectNewLeader':
+  if len(args) != 1:
+    print 'ElectNewLeader requires 1 args'
+    sys.exit(1)
+  pp.pprint(client.ElectNewLeader(eval(args[0]),))
 
 else:
   print 'Unrecognized method %s' % cmd

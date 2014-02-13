@@ -104,10 +104,12 @@ class PaxosHandler:
 
   def Learn(self, instance, cmd):
     print 'Learn', instance, cmd
+    if self.commands[instance]:
+      return
     self.commands[instance] = cmd
-    if instance == self.last_run_command + 1:
+    while self.commands[self.last_run_command + 1]:
       self.last_run_command += 1
-      cmd_id, node_id, cmd = cmd.split('_')
+      cmd_id, node_id, cmd = self.commands[self.last_run_command].split('_')
       node_id = int(node_id)
       cmd_id = int(cmd_id)
       command, mutex, worker = cmd.split(' ')
@@ -124,6 +126,7 @@ class PaxosHandler:
         #TODO: this can only be sent to the broker that locked it in the first place
         if response > 0:
           self.broker.GotLock(int(mutex), response)
+        
   
   def RunPhase2(self, instance, cmd):
     """Returns 0 if successful, or the number of the highest proposal number
@@ -153,6 +156,33 @@ class PaxosHandler:
     else:
       return np.max(responses[responses != 0])
           
+  def FigureNewLeader(self, current_instance):
+    """Prepares current_instance with my current_proposal_number, and figures
+    out who the new leader is and what the new proposal number is. Updates both
+    of them"""
+    print 'FigureNewLeader', current_instance
+    nodes = range(self.num_nodes)
+    nodes.remove(self.my_id)
+    proposal_number = self.current_proposal_number * 1000 + self.my_id
+    # asking my own acceptor
+    responses = [self.acceptor.Prepare(current_instance, proposal_number).highest_prepared]
+    while len(responses) < self.majority:
+      node = np.random.choice(nodes)
+      try:
+        # This doesnt work with more than 1000 nodes
+        responses.append(self.nodes.clients[node].Prepare(current_instance, proposal_number).highest_prepared)
+        # Whenever a node responds, I can remove it from the list of nodes
+        # to be queried.
+        nodes.remove(node)
+     except:
+        try:
+          self.nodes.transports[node].open()
+        except:
+          pass
+    self.leader = max(responses) % 1000
+    self.current_proposal_number = int(max(responses) / 1000)
+
+    
   def RunCommand(self, cmd_id, node_id, command):
     # Command here is in the form:
     # Lock 1 2
@@ -175,72 +205,65 @@ class PaxosHandler:
               print 'Exception learning'
               pass
       else:
-        #TODO: I am not the leader anymore, must learn new leader and etc. 
-        #Shrainik: Just update  self.leader to ++ and ask him to run the command. 
-        #If that guy is down try the next one, until we find someone who is up. 
-        #that node will either run the command, or send it to the leader. 
-        #liveness is gauranteed.
-
-        to_continue = true
-        assumed_leader = self.leader + 1
-        while to_continue:
-          try:
-            self.nodes.transports[assumed_leader].open()
-            self.nodes.clients[assumed_leader].RunCommand(cmd_id, node_id, command)
-            self.leader = assumed_leader
-            to_continue = false
-          except:
-            assumed_leader += 1
-            pass
+        self.FigureNewLeader(self.last_run_command + 1)
+        self.RunCommand(cmd_id, node_id, command)
     else:
-      to_continue = true
-      while to_continue:
-        try:
-          self.nodes.transports[self.leader].open()
-          self.nodes.clients[self.leader].RunCommand(cmd_id, node_id, command)
-          to_continue = false
-        except:
-          self.ElectNewLeader(self.leader + 1)
-          for i in range(self.num_nodes):
-            if i != self.my_id:
-              try:
-                self.nodes.transports[i].open()
-                self.nodes.clients[i].ElectNewLeader(self.leader)
-              except:
-                pass
-          #TODO: must still run this command!
-          #Shrainik: the while loop should take care of this.
-    pass
+      try:
+        self.nodes.transports[self.leader].open()
+        self.nodes.clients[self.leader].RunCommand(cmd_id, node_id, command)
+      except:
+        self.ElectNewLeader((self.leader + 1) % self.num_nodes )
+        for i in range(self.num_nodes):
+          if i != self.my_id:
+            try:
+              self.nodes.transports[i].open()
+              self.nodes.clients[i].ElectNewLeader(self.leader)
+            except:
+              pass
+        self.RunCommand(cmd_id, node_id, command)
     
   def ElectNewLeader(self, new_leader):
     print 'ElectNewLeader'
     if (new_leader != self.leader):
       self.leader = new_leader
-      sleep(1)
+      self.current_proposal_number += 1
     if self.leader == self.my_id:
-      #Prepare everything not yet run.
-      for i in range(self.last_run_command+1, self.last_command):
-        for j in range(self.num_nodes):
-          if j == self.my_id:
-            self.Prepare(i, self.current_proposal_number + 1)
-          else
-            try:
-                self.nodes.transports[i].open()
-                self.nodes.clients[i].Prepare(i, self.current_proposal_number + 1)
-              except:
-                pass
-      #PrepareFuture everything yet to run.
-      for i in range(self.last_command, 10000):
-        for j in range(self.num_nodes):
-          if j == self.my_id:
-            self.PrepareFuture(i, self.current_proposal_number + 1)
-          else
-            try:
-                self.nodes.transports[i].open()
-                self.nodes.clients[i].PrepareFuture(i, self.current_proposal_number + 1)
-              except:
-                pass
-    pass
+      nodes = range(self.num_nodes)
+      nodes.remove(self.my_id)
+      proposal_number = self.current_proposal_number * 1000 + self.my_id
+      # asking my own acceptor
+      responses = [self.acceptor.PrepareFuture(self.last_run_command + 1, proposal_number)]
+      while len(responses) < self.majority:
+        node = np.random.choice(nodes)
+        try:
+          # This doesnt work with more than 1000 nodes
+          responses.append(self.nodes.clients[node].PrepareFuture(self.last_run_command + 1, proposal_number))
+          # Whenever a node responds, I can remove it from the list of nodes
+          # to be queried.
+          nodes.remove(node)
+       except:
+          try:
+            self.nodes.transports[node].open()
+          except:
+            pass
+     promised = [x.promised for x in responses] 
+     # If I'm not able to become the new leader, learn who it is.
+     if sum(promised) < self.majority:
+       self.FigureNewLeader(self.last_run_command + 1)
+     else:
+       accepted_count = collections.defaultdict(lambda:0)
+       value_to_propose = {}
+       for response in responses:
+         for i in range(len(response.accepted)):
+           accepted_count[response.accepted[i]] += 1
+           value_to_propose[response.accepted[i]] = response.values[i]
+       for instance,count  in accepted_count.iteritems():
+         if count >= self.majority:
+           self.Learn(instance, value_to_propose[instance])  
+         else:
+           cmd_id, node_id, command = value_to_propose[instance].split('_')
+           self.RunCommand(cmd_id, node_id, command)
+        
 
   # This is all other people calling my acceptor.
   def Propose(self, instance, proposal_number, value):
