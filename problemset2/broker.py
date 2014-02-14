@@ -15,6 +15,7 @@ import socket
 import time
 import argparse
 import numpy as np
+import os
 from threading import Condition
 import threading
 class BrokerHandler:
@@ -62,7 +63,9 @@ class BrokerHandler:
       self.conds[mutex].notify()
     self.conds[mutex].release()
   def Kill(self):
-    exit(0)
+    self.paxos.Kill()
+    sys.stdout.flush()
+    os._exit(0)
     
 class PaxosClient:
   """Encapsulates paxos client"""
@@ -83,6 +86,12 @@ class PaxosClient:
       except:
         self.transport.open()
 
+  def Kill(self):
+    try:
+      self.client.Kill()
+    except:
+      pass
+    
     
 
 def main():

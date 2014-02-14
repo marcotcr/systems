@@ -1,6 +1,15 @@
 #!/bin/sh
 python start_nodes.py -l 10 -n 3
 sleep 1
+# Node 0:
+# Broker: 8887
+# Paxos: 8888
+# Node 1:
+# Broker: 8886
+# Paxos: 8889
+# Node 2:
+# Broker: 8885
+# Paxos: 8890
 ./Broker-remote -h localhost:8887 Lock 0 1
 ./Broker-remote -h localhost:8887 Unlock 0 1
 ./Broker-remote -h localhost:8887 Lock 1 1

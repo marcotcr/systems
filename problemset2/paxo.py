@@ -66,7 +66,7 @@ class Acceptor:
     return response
   
   def PrepareFuture(self, instance, proposal_number):
-    print 'Prepare Future', instance, proposal_number
+    # print 'Prepare Future', instance, proposal_number
     return_ = PrepareFutureResponse(accepted=[], values=[])
     if proposal_number < self.future_promise[1]:
       return_.promised = False
@@ -80,17 +80,15 @@ class Acceptor:
       if self.accepted[i]:
         return_.accepted.append(i)
         return_.values.append(self.accepted[i])
-    print return_
+    # print return_
     return return_
 
       
 class PaxosHandler:
   def __init__(self, n_locks, my_id, nodes, leader, broker):
-    # TODO: init from log file
-    # Shrainik: We dont need to implement recovery for this assignment. as per catalyst.
-    # TODO: think about this
     self.commands = [None for x in xrange(10000)]
     self.last_run_command = -1
+    self.last_chosen_command = -1
     self.lock_machine = lock_machine.LockMachine(n_locks)
     self.acceptor = Acceptor()
     self.leader = leader
@@ -102,30 +100,36 @@ class PaxosHandler:
     self.broker = broker
 
   def Kill(self):
-    print 'Kill'
+    print 'KILLED'
     sys.stdout.flush()
     os._exit(0)
   def Ping(self):
-    print 'pinged'
+    #print 'pinged'
     sys.stdout.flush()
     return 1
 
   def Learn(self, instance, cmd):
-    print 'Learn', instance, cmd
     if self.commands[instance]:
       return
+    print 'Learn', instance, cmd
+    self.last_chosen_command = max(self.last_chosen_command, instance)
     self.commands[instance] = cmd
     while self.commands[self.last_run_command + 1]:
       self.last_run_command += 1
       cmd_id, node_id, cmd = self.commands[self.last_run_command].split('_')
       node_id = int(node_id)
       cmd_id = int(cmd_id)
-      command, mutex, worker = cmd.split(' ')
+      command = ''
+      try:
+        command, mutex, worker = cmd.split(' ')
+      except:
+        command = cmd
+      print 'Running command:', cmd
       if command == 'noop':
         pass
       elif command == 'Lock':
         locked = self.lock_machine.Lock(int(mutex), int(worker))
-        print locked, mutex, worker
+        # print locked, mutex, worker
         # I only need to do this if my id == node_id
         if locked:
           self.broker.GotLock(int(mutex), int(worker))
@@ -140,7 +144,7 @@ class PaxosHandler:
   def RunPhase2(self, instance, cmd):
     """Returns 0 if successful, or the number of the highest proposal number
     prepared by any acceptor."""
-    print 'RunPhase2'
+    print 'RunPhase2. Instance:', instance, 'Command:',  cmd,
     nodes = range(self.num_nodes)
     nodes.remove(self.my_id)
     proposal_number = self.current_proposal_number * 1000 + self.my_id
@@ -149,13 +153,16 @@ class PaxosHandler:
     responses = [self.acceptor.Propose(self.last_run_command + 1, proposal_number, cmd)]
     while len(responses) < self.majority:
       node = np.random.choice(nodes)
+      print 'Asking node', node, '...',
       try:
         # This doesnt work with more than 1000 nodes
         responses.append(self.nodes.clients[node].Propose(self.last_run_command + 1, proposal_number, cmd))
+        print 'Got response:', responses[-1]
         # Whenever a node responds, I can remove it from the list of nodes
         # to be queried.
         nodes.remove(node)
       except:
+        print 'Failed'
         try:
           self.nodes.transports[node].open()
         except:
@@ -195,40 +202,42 @@ class PaxosHandler:
     print 'new leader:', self.leader
 
     
-  def RunCommand(self, cmd_id, node_id, command):
+  def RunCommand(self, cmd_id, node_id, command, instance=None):
     # Command here is in the form:
     # Lock 1 2
     # Unlock 2 3
-    print 'Run Command', cmd_id, node_id, command
+    print 'Run Command. Cmd id:', cmd_id, 'Node id:', node_id, 'Command:', command
     full_command = str(cmd_id) + '_' + str(node_id) + '_' + command
     if self.my_id == self.leader:
+      if not instance:
+        instance = self.last_run_command + 1
+      print 'Instance: ', instance, 'Last run', self.last_run_command + 1
       #TODO: call runPhase2 with correct instance and cmd id
-      print 'I\'m trying to run phase2 with ', self.last_run_command + 1, full_command
-      chosen = self.RunPhase2(self.last_run_command + 1, full_command)
+      #print 'I\'m trying to run phase2 with ', self.last_run_command + 1, full_command
+      chosen = self.RunPhase2(instance, full_command)
       # This value was chosen
       if chosen == 0:
-        self.Learn(self.last_run_command + 1, full_command)
+        self.Learn(instance, full_command)
         for i in range(self.num_nodes):
           if i != self.my_id:
             try:
               self.nodes.transports[i].open()
-              self.nodes.clients[i].Learn(self.last_run_command, full_command)
+              self.nodes.clients[i].Learn(instance, full_command)
             except:
-              print sys.exc_info()[0]
-              print 'Exception learning'
+              #print sys.exc_info()[0]
+              #print 'Exception learning'
               pass
       else:
-        print 'FAIL: Chosen=', chosen
+        print 'Run Phase2 FAIL. Highest prepare=', chosen
         self.leader = chosen % 1000
         self.current_proposal_number = int(chosen / 1000)
-        print 'New leader:', self.leader
-        print 'New proposal #', self.current_proposal_number
+        print 'New leader: %d, current proposal number: %d' % (self.leader, self.current_proposal_number)
         #self.FigureNewLeader(self.last_run_command + 1)
-        self.RunCommand(cmd_id, node_id, command)
+        self.RunCommand(cmd_id, node_id, command, instance)
     else:
       try:
         self.nodes.transports[self.leader].open()
-        self.nodes.clients[self.leader].RunCommand(cmd_id, node_id, command)
+        self.nodes.clients[self.leader].RunCommand(cmd_id, node_id, command, instance)
       except:
         self.ElectNewLeader((self.leader + 1) % self.num_nodes )
         for i in range(self.num_nodes):
@@ -238,10 +247,10 @@ class PaxosHandler:
               self.nodes.clients[i].ElectNewLeader(self.leader)
             except:
               pass
-        self.RunCommand(cmd_id, node_id, command)
+        self.RunCommand(cmd_id, node_id, command, instance)
     
   def ElectNewLeader(self, new_leader):
-    print 'ElectNewLeader'
+    print 'ElectNewLeader', new_leader
     if (new_leader != self.leader):
       self.leader = new_leader
       self.current_proposal_number += 1
@@ -286,16 +295,19 @@ class PaxosHandler:
             self.Learn(instance, value_to_propose[instance])  
           else:
             cmd_id, node_id, command = value_to_propose[instance].split('_')
-            self.RunCommand(cmd_id, node_id, command)
+            self.RunCommand(cmd_id, node_id, command, instance)
+        for instance in range(self.last_run_command, self.last_chosen_command):
+          if not self.commands[instance]:
+            self.RunCommand(0, 0, 'noop', instance)
         
 
   # This is all other people calling my acceptor.
   def Propose(self, instance, proposal_number, value):
-    print 'Propose', instance, proposal_number, value
+    #print 'Propose', instance, proposal_number, value
     return self.acceptor.Propose(instance, proposal_number, value)
 
   def Prepare(self, instance, proposal_number):
-    print 'Prepare'
+    # print 'Prepare'
     # If this instance already has a chosen value
     response = self.acceptor.Prepare(instance, proposal_number)
     if self.commands[instance]:
@@ -345,7 +357,7 @@ class BrokerClient:
 
   def GotLock(self, mutex, worker):
     while True:
-      print 'Trying broker'
+      #print 'Trying broker'
       try:
         self.client.GotLock(mutex, worker)
         break
