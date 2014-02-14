@@ -21,6 +21,7 @@ import lock_machine
 import argparse
 import numpy as np
 import os
+import threading
  
 
 class Acceptor:
@@ -44,27 +45,6 @@ class Acceptor:
       else:
         return self.promised[instance]
 
-  def Prepare(self, instance, proposal_number):
-    response = PrepareResponse()
-    if self.accepted[instance]:
-      response.highest_accepted_value = self.accepted[instance]
-    if instance >= self.future_promise[0]:
-      if proposal_number > max(self.future_promise[1],self.promised[instance]):
-        response.promised = True
-        self.promised[instance] = proposal_number
-      else:
-        response.promised = False
-        response.highest_prepared = max(self.future_promise[1], self.promised[instance])
-    else:
-      response.highest_prepared = self.promised[instance]
-      if proposal_number > self.promised[instance]:
-        response.promised = True
-        self.promised[instance] = proposal_number
-      else:
-        response.promised = False
-    response.value_is_chosen = False
-    return response
-  
   def PrepareFuture(self, instance, proposal_number):
     # print 'Prepare Future', instance, proposal_number
     return_ = PrepareFutureResponse(accepted=[], values=[])
@@ -92,6 +72,8 @@ class PaxosHandler:
     self.lock_machine = lock_machine.LockMachine(n_locks)
     self.acceptor = Acceptor()
     self.leader = leader
+    self.learn_lock = threading.Lock()
+    self.leader_lock = threading.RLock()
     self.my_id = my_id
     self.nodes = nodes
     self.num_nodes = len(self.nodes.clients)
@@ -111,6 +93,7 @@ class PaxosHandler:
   def Learn(self, instance, cmd):
     if self.commands[instance]:
       return
+    self.learn_lock.acquire()
     print 'Learn', instance, cmd
     self.last_chosen_command = max(self.last_chosen_command, instance)
     self.commands[instance] = cmd
@@ -135,10 +118,11 @@ class PaxosHandler:
           self.broker.GotLock(int(mutex), int(worker))
       elif command == 'Unlock':
         response = self.lock_machine.Unlock(int(mutex), int(worker))
-        print 'Unlock got response', response
+        # print 'Unlock got response', response
         #TODO: this can only be sent to the broker that locked it in the first place
         if response > 0:
           self.broker.GotLock(int(mutex), response)
+    self.learn_lock.release()
         
   
   def RunPhase2(self, instance, cmd):
@@ -174,44 +158,18 @@ class PaxosHandler:
     else:
       return np.max(responses[responses != 0])
           
-  def FigureNewLeader(self, current_instance):
-    """Prepares current_instance with my current_proposal_number, and figures
-    out who the new leader is and what the new proposal number is. Updates both
-    of them"""
-    print 'FigureNewLeader', current_instance
-    nodes = range(self.num_nodes)
-    nodes.remove(self.my_id)
-    proposal_number = self.current_proposal_number * 1000 + self.my_id
-    # asking my own acceptor
-    responses = [self.acceptor.Prepare(current_instance, proposal_number).highest_prepared]
-    while len(responses) < self.majority:
-      node = np.random.choice(nodes)
-      try:
-        # This doesnt work with more than 1000 nodes
-        responses.append(self.nodes.clients[node].Prepare(current_instance, proposal_number).highest_prepared)
-        # Whenever a node responds, I can remove it from the list of nodes
-        # to be queried.
-        nodes.remove(node)
-      except:
-        try:
-          self.nodes.transports[node].open()
-        except:
-          pass
-    self.leader = max(responses) % 1000
-    self.current_proposal_number = int(max(responses) / 1000)
-    print 'new leader:', self.leader
-
     
   def RunCommand(self, cmd_id, node_id, command, instance=None):
     # Command here is in the form:
     # Lock 1 2
     # Unlock 2 3
+    print
     print 'Run Command. Cmd id:', cmd_id, 'Node id:', node_id, 'Command:', command
     full_command = str(cmd_id) + '_' + str(node_id) + '_' + command
     if self.my_id == self.leader:
       if not instance:
         instance = self.last_run_command + 1
-      print 'Instance: ', instance, 'Last run', self.last_run_command + 1
+      # print 'Instance: ', instance, 'Last run', self.last_run_command + 1
       #TODO: call runPhase2 with correct instance and cmd id
       #print 'I\'m trying to run phase2 with ', self.last_run_command + 1, full_command
       chosen = self.RunPhase2(instance, full_command)
@@ -232,13 +190,14 @@ class PaxosHandler:
         self.leader = chosen % 1000
         self.current_proposal_number = int(chosen / 1000)
         print 'New leader: %d, current proposal number: %d' % (self.leader, self.current_proposal_number)
-        #self.FigureNewLeader(self.last_run_command + 1)
         self.RunCommand(cmd_id, node_id, command, instance)
     else:
       try:
         self.nodes.transports[self.leader].open()
-        self.nodes.clients[self.leader].RunCommand(cmd_id, node_id, command, instance)
+        self.nodes.clients[self.leader].RunCommand(cmd_id, node_id, command)
       except:
+        # print 'I tried connecting to %d\n' % self.leader
+        # print self.nodes.clients[self.leader]
         self.ElectNewLeader((self.leader + 1) % self.num_nodes )
         for i in range(self.num_nodes):
           if i != self.my_id:
@@ -250,7 +209,9 @@ class PaxosHandler:
         self.RunCommand(cmd_id, node_id, command, instance)
     
   def ElectNewLeader(self, new_leader):
+    print
     print 'ElectNewLeader', new_leader
+    self.leader_lock.acquire()
     if (new_leader != self.leader):
       self.leader = new_leader
       self.current_proposal_number += 1
@@ -260,7 +221,7 @@ class PaxosHandler:
       proposal_number = self.current_proposal_number * 1000 + self.my_id
       # asking my own acceptor
       responses = [self.acceptor.PrepareFuture(self.last_run_command + 1, proposal_number)]
-      print 'Im new leader. Trying to prepare future', self.last_run_command + 1, proposal_number
+      print 'Im new leader. Trying to prepare future', self.last_run_command + 1, proposal_number,
       while len(responses) < self.majority:
         node = np.random.choice(nodes)
         try:
@@ -278,12 +239,12 @@ class PaxosHandler:
       highest_prepared = max([x.highest_prepared for x in responses])
       # If I'm not able to become the new leader, learn who it is.
       if sum(promised) < self.majority:
-        print 'Not able to become new leader. The actual new leader is:'
+        print '   ...Not able to become new leader. The actual new leader is:'
         print responses
         self.leader = highest_prepared % 1000
         self.current_proposal_number = int(highest_prepared / 1000)
-        #self.FigureNewLeader(self.last_run_command + 1)
       else:
+        print '  ...Sucess'
         accepted_count = collections.defaultdict(lambda:0)
         value_to_propose = {}
         for response in responses:
@@ -299,21 +260,13 @@ class PaxosHandler:
         for instance in range(self.last_run_command, self.last_chosen_command):
           if not self.commands[instance]:
             self.RunCommand(0, 0, 'noop', instance)
+    self.leader_lock.release()
         
 
   # This is all other people calling my acceptor.
   def Propose(self, instance, proposal_number, value):
     #print 'Propose', instance, proposal_number, value
     return self.acceptor.Propose(instance, proposal_number, value)
-
-  def Prepare(self, instance, proposal_number):
-    # print 'Prepare'
-    # If this instance already has a chosen value
-    response = self.acceptor.Prepare(instance, proposal_number)
-    if self.commands[instance]:
-      response.value_is_chosen = True
-      response.highest_accepted_value = self.commands[instance]
-    return response
 
   def PrepareFuture(self, instance, proposal_number):
     return self.acceptor.PrepareFuture(instance, proposal_number)

@@ -25,7 +25,7 @@ sleep 1
 ./Paxos-remote -h localhost:8889 Propose 1 0 "0_0_Unlock 1 1"
 ./Paxos-remote -h localhost:8889 Learn 3 "0_3_Lock 2 2"
 ./Paxos-remote -h localhost:8890 Learn 3 "0_3_Lock 2 2"
-./Broker-remote -h localhost:8887 Kill
+./Paxos-remote -h localhost:8888 Kill
 python ping_nodes.py -l 10 -n 3 > /dev/null 2>/dev/null
 echo "Now do the following:"
 echo "./Broker-remote -h localhost:8886 Lock 1 2"
