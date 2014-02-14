@@ -100,9 +100,7 @@ def main():
   parser.add_argument('-p', '--paxos', required=True, help="paxos handler's ip:port")
   parser.add_argument('-m', '--myport', type=int, required=True, help="My port")
   parser.add_argument('-i', '--my_id', type=int, required=True, help="My id")
-  # parser.add_argument('-o', '--output', default='/dev/null', dest='output', help="output file, saving progress")
   args = parser.parse_args()
-  # paxos
   paxos_host, paxos_port = args.paxos.split(':')
   paxos = PaxosClient(paxos_host, int(paxos_port))
 
@@ -113,7 +111,6 @@ def main():
   tfactory = TTransport.TBufferedTransportFactory()
   pfactory = TBinaryProtocol.TBinaryProtocolFactory()
   
-  #server = TServer.TSimpleServer(processor, transport, tfactory, pfactory)
   server = TServer.TThreadedServer(processor, transport, tfactory, pfactory)
    
    

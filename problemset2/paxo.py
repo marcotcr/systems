@@ -1,7 +1,3 @@
-# This is a blocking server, except for flush_all and set_multi. If it becomes a bottleneck, we would have to do it
-# in C++, or use threading (even though we have the interpreter lock), or
-# something. For now, I'm planning on using this instead of the single memcached
-# server and see how it performs.
 import sys
 sys.path.append('gen-py')
 sys.path.append('gen-py/paxos')
@@ -46,7 +42,9 @@ class Acceptor:
         return self.promised[instance]
 
   def PrepareFuture(self, instance, proposal_number):
-    # print 'Prepare Future', instance, proposal_number
+    """Prepares all instances after and including 'instance' with
+    proposal_number. If promises are granted, returns the currently accepted
+    values for instances that have already been accepted in the range"""
     return_ = PrepareFutureResponse(accepted=[], values=[])
     if proposal_number < self.future_promise[1]:
       return_.promised = False
@@ -60,7 +58,6 @@ class Acceptor:
       if self.accepted[i]:
         return_.accepted.append(i)
         return_.values.append(self.accepted[i])
-    # print return_
     return return_
 
       
@@ -82,15 +79,19 @@ class PaxosHandler:
     self.broker = broker
 
   def Kill(self):
+    """Kills this. This generates an exception if called by Paxos-Remote, but it
+    is harmless"""
     print 'KILLED'
     sys.stdout.flush()
     os._exit(0)
   def Ping(self):
-    #print 'pinged'
     sys.stdout.flush()
     return 1
 
   def Learn(self, instance, cmd):
+    """Learns an instance (if not already learned). Will execute commands in the
+    state machine if all previous commands have already been executed. Will also
+    notify a broker if some client has been granted a lock""" 
     if self.commands[instance]:
       return
     self.learn_lock.acquire()
@@ -112,14 +113,10 @@ class PaxosHandler:
         pass
       elif command == 'Lock':
         locked = self.lock_machine.Lock(int(mutex), int(worker))
-        # print locked, mutex, worker
-        # I only need to do this if my id == node_id
         if locked:
           self.broker.GotLock(int(mutex), int(worker))
       elif command == 'Unlock':
         response = self.lock_machine.Unlock(int(mutex), int(worker))
-        # print 'Unlock got response', response
-        #TODO: this can only be sent to the broker that locked it in the first place
         if response > 0:
           self.broker.GotLock(int(mutex), response)
     self.learn_lock.release()
@@ -169,9 +166,6 @@ class PaxosHandler:
     if self.my_id == self.leader:
       if not instance:
         instance = self.last_run_command + 1
-      # print 'Instance: ', instance, 'Last run', self.last_run_command + 1
-      #TODO: call runPhase2 with correct instance and cmd id
-      #print 'I\'m trying to run phase2 with ', self.last_run_command + 1, full_command
       chosen = self.RunPhase2(instance, full_command)
       # This value was chosen
       if chosen == 0:
@@ -182,8 +176,6 @@ class PaxosHandler:
               self.nodes.transports[i].open()
               self.nodes.clients[i].Learn(instance, full_command)
             except:
-              #print sys.exc_info()[0]
-              #print 'Exception learning'
               pass
       else:
         print 'Run Phase2 FAIL. Highest prepare=', chosen
@@ -191,13 +183,14 @@ class PaxosHandler:
         self.current_proposal_number = int(chosen / 1000)
         print 'New leader: %d, current proposal number: %d' % (self.leader, self.current_proposal_number)
         self.RunCommand(cmd_id, node_id, command, instance)
+    # I'm not the leader
     else:
+      # Try to forward command to leader
       try:
         self.nodes.transports[self.leader].open()
         self.nodes.clients[self.leader].RunCommand(cmd_id, node_id, command)
+      # if fail, elect new leader
       except:
-        # print 'I tried connecting to %d\n' % self.leader
-        # print self.nodes.clients[self.leader]
         self.ElectNewLeader((self.leader + 1) % self.num_nodes )
         for i in range(self.num_nodes):
           if i != self.my_id:
@@ -209,6 +202,11 @@ class PaxosHandler:
         self.RunCommand(cmd_id, node_id, command, instance)
     
   def ElectNewLeader(self, new_leader):
+    """Learns the new leader and increases current_proposal_number. If this node
+    is the new leader, prepares all instances in the future with the appropriate
+    proposal number. If I am the new leader, but see a proposal number higher
+    than mine when trying to prepare, I must infer that some other leader has
+    been elected, and learn who it is."""
     print
     print 'ElectNewLeader', new_leader
     self.leader_lock.acquire()
@@ -265,7 +263,6 @@ class PaxosHandler:
 
   # This is all other people calling my acceptor.
   def Propose(self, instance, proposal_number, value):
-    #print 'Propose', instance, proposal_number, value
     return self.acceptor.Propose(instance, proposal_number, value)
 
   def PrepareFuture(self, instance, proposal_number):
@@ -297,7 +294,7 @@ class Nodes:
       self.sockets.append(socket)
 
 class BrokerClient:
-  """Encapsulates paxos client"""
+  """Encapsulates broker client"""
   def __init__(self, host, port):
     socket = TSocket.TSocket(host, port)
     self.transport = TTransport.TBufferedTransport(socket)
@@ -324,8 +321,6 @@ def main():
   parser.add_argument('-i', '--my_id', type=int, required=True, help="This machine's ID (must be integer)")
   parser.add_argument('-n', '--nodes', required=True, dest='nodes', nargs = '+', help="all nodes in the form ip:port")
   parser.add_argument('-b', '--broker', required=True, help="broker handler's ip:port")
-  # parser.add_argument('-e', '--error', default=0, type=float, dest='error', help="desired error rate")
-  # parser.add_argument('-o', '--output', default='/dev/null', dest='output', help="output file, saving progress")
   args = parser.parse_args()
   if len(args.nodes) < 3:
     print 'We need at least three nodes to run'
@@ -341,7 +336,6 @@ def main():
   transport = TSocket.TServerSocket(port=port)
   tfactory = TTransport.TBufferedTransportFactory()
   pfactory = TBinaryProtocol.TBinaryProtocolFactory()
-  #server = TServer.TSimpleServer(processor, transport, tfactory, pfactory)
   server = TServer.TThreadedServer(processor, transport, tfactory, pfactory)
 
   print "Starting python server..."
