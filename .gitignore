@@ -16,3 +16,13 @@
 problemset1/partb/server
 
 problemset1/partb/foo.tgz
+
+*.aux
+
+*.log
+
+*.out
+
+*.gz
+
+problemset2/writeup/Architecture-eps-converted-to.pdf
