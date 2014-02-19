@@ -1,5 +1,5 @@
 \documentclass[letterpaper]{article}
-\title{Auto Scaling for Analytics on Streaming Data}
+\title{Auto Scaling Online Learning}
 \date{}
 \usepackage{balance}  % to better equalize the last page
 \usepackage{graphicx}
@@ -37,17 +37,67 @@
 \maketitle
 
 \section{Background and Prior work}
-The task of predicting the appropriate content to a user in an internet setting involves the concept of streaming data. A generic machine learning problem can be broken down into 2 major steps, 1 - Learning a model from data, and 2 - Making predictions according to the model. In case of streaming data, we need to constantly learn and update our model as we get newer data. There are multiple challenges while proposing a solution to this problem. \\First challenge is that the amount of data is always growing, so we cannot keep archiving it, both becuase of storage constraints and computation constraints. The usual solution to deal with this problem is to keep only the meaningful things about data, maybe just the model, and forget the rest of it, and when newer data comes in, use the newer data plus the existing model to come up with a newer model. This can be achieved by implementing incremental algorithms or with periodic re-training of the model with a batch algorithm. \\Second challenge is the velocity of this data. Imagine a learning problem where in the learning dataset is a live twitter stream for a hashtag. In this scenario the rate at which the data comes in is a function of the popularity of the hashtag. \\
-The problem we are trying to solve is to automatically handle the changing storage and computions needs for such scenario by integrating intelligent scaling into the solution. Most of the current auto-scaling is implemented for services that are easily replicated. Some examples include the amazon web services which have an option for auto-scaling, but that entails just spawing a new server with the same app or the Google AppEngine, which scales approriately depending on the number of user requests. The assumption of easy replication is not true for machine learning scenarios.
+Online machine learning algorithms operate on a single instance at a time. They
+have become particularly popular in natural language processing and applications
+with streaming data, including classification, ranking, etc
+\cite{Bordes:2005:HSE:2130928.2130979,
+Carvalho:2006:SOL:1150402.1150466, Dredze:2008:CLC:1390156.1390190}. Online
+learning is particularly interesting in the scenarios where data keeps streaming
+in, such as a web search engine doing advertisement placement. It is also
+interesting for scenarios where the whole dataset is too large to fit in main
+memory, as online learning only operates on a single example at a time.
+
+A lot of tasks that use online learning have a particular structure that can be 
+broken down into 2 major components: 1 - Learning a model from data, and 2 -
+making predictions according to the model. Going back to the web search engine
+scenario as an example: the system needs to make predictions for every user
+doing a query - and must also learn from the feedback given by those users.
+
+This structure comes with multiple challenges. First, the 
+the amount of data is always growing, so archiving it comes at a cost, both
+because of storage constraints and computation constraints. A solution to this
+is to just keep the current model in memory, and archive the rest in the
+background. A second challenge is the
+variable speed at which data streams in. Imagine a learning problem where in the
+learning dataset is a live twitter stream for a hashtag. In this scenario the
+rate at which the data comes in is a function of the popularity of the hashtag.
+Finally, different applications have different costs for learning, and different
+requirements for the latency of predictions.
+
 \section{Proposed work}
-We want implement some intelligent auto scaling while maintain the prediction service SOA, and some measurement of learning, with the minimum cost possible. This problem is difficult becuase we can't just spawn another instance, because learning in parallel is hard. One possible solution is to have one node always be the learners and scale the number of predictors. We also need some sort of a load balancer and a manager to decide when to set up more machines. These are non trivial problems as having a single learner or a single load balancer add single points of failure to the system and also limit scalablity. \\
-The focus of this project won't be deal with the machine learning aspect, we plan to use some out-of-box tools for it, what we want to target on is:
+The problem we will tackle in this project is the problem of automatically
+handling the resources needed for online learning. The ideal system would
+allocate the resources necessary to keep the prediction latency acceptable,
+while at the same time learning appropriately. Finally, the system would be able
+to handle bursts (such as increase in demand) and different learning
+requirements for different systems.
+
+Most of the current auto-scaling solutions handle services that are
+easily replicated. Some examples include Amazon Web
+Services\footnote{http://aws.amazon.com/}, which has an
+option for auto-scaling, but that entails just spawning a new server with the
+same app or the Google AppEngine, which scales appropriately depending on the
+number of user requests. The assumption of easy replication is not true for
+machine learning scenarios. Learning in a distributed scenario is a problem on
+its own \cite{pserver1, pserver2}. Also, the system is two-tiered: there may be
+a case where more learners are needed, and there may be a case where more
+predictors are needed.
+
+Our goal is to implement intelligent auto scaling while maintaining some
+prediction service SOA, and some measurement of learning, with the minimum cost
+possible. We plan on implementing a smart load-balancer that also handles the
+spawning of new nodes, but we also don't want this load-balancer to be a
+bottleneck, or a liability. Our current plan is to make it be a set of nodes.
+We won't focus on the machine learning side of it, so we plan on using an
+out-of-the-box fast machine learning solver: Vowpal Wabbit
+\footnote{http://hunch.net/~vw/}. The challenges we see at the moment are:
 \begin{itemize}
-\item Determining when to start more machines.
-\item What role the new machines should play.
-\item When to shutdown some machines.
-\item How to ensure the system is fault taulerant.
+\item Determining when to start or shutdown more machines.
+\item Determining the role the new machines should play, and making sure that
+new predictors have a current model that is not too stale.
+\item Ensuring that the system is fault taulerant.
 \end{itemize}
+
 \section{Roadmap}
 Project Milestone: 
 \begin{itemize} 
@@ -56,7 +106,8 @@ Project Milestone:
 \end{itemize}
 Short Presentation:
 \begin{itemize} 
-\item Next step would be to set up (possibly simulated) environment and implement our auto scaling system using standard BigML tools. 
+\item Setting up (possibly simulated) environment and
+implement a first version of  our auto scaling system. 
 \end{itemize}
 Final Report:
 \begin{itemize}
@@ -64,7 +115,8 @@ Final Report:
 \item Learning and results from the implementation (possibly simulated)
 \end{itemize}
 
-\section{References}
+\bibliographystyle{plain}
+\bibliography{references}
 %\begin{figure}[h!]
 %\centering
 %\includegraphics[scale=.5]{multipaxos.png}
