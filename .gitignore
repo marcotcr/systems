@@ -26,3 +26,7 @@ problemset1/partb/foo.tgz
 *.gz
 
 problemset2/writeup/Architecture-eps-converted-to.pdf
+
+*.bbl
+
+*.blg
