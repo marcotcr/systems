@@ -34,20 +34,54 @@
 \maketitle
 
 \section{Progress}
-So far we have decided upon an architecture for the Auto Scaling system. For now we will treat the machine learning aspect as a black box, we will use \cite{MachineLearningSystem} for this.
-The architecture can we visualized as a set of nodes acting as a learners and predictors. For further simplicity, we assume only one node acting as a learner at a time. Other than this, this is a master load balancing node 
-which handles incoming requests from clients and redirects them to learner and predictors as applicable. All the communication between the master node and the other nodes and clients is done via Thrift\footnote{http://thrift.apache.org}. 
+Our project relates to auto-scaling machine learning algorithms (more specifically, online
+learning). For now, we will treat the machine learning aspect as a black box. Our plan is to
+use Vowpal Wabbit\cite{http://hunch.net/~vw/}, but in order to focus on the
+systems side of things, we have decided to start with a dummy machine learning
+server, that takes a determined time to do each operation. In this way, we can
+focus on setting policies for auto-scaling and simulating different stream
+speeds, without having to worry about all the ML complications.
+
+The architecture we are using can we thought of as a
+set of nodes acting as a learners and predictors. For further simplicity, we
+assume only one node acting as a learner at a time. Other than this, there is a
+load balancer (which can be a group of nodes) which handles incoming
+requests from clients and
+redirects them to learner and predictors as applicable. This load balancer is
+also responsible for firing up new machines, or turning them off. All the
+communication between the master node and the other nodes and clients is done
+via Thrift\footnote{http://thrift.apache.org}. 
 \\
-The master node or the load balancer has information about all the running nodes and criteria for load balancing based on the weighted sum of load per node. Further, the master also implements a learning algorithm to predict the load. We will using something similar to \cite{LoadPrediction} for load prediction. 
-\\
-The clients communicate with master directly. As of now, we have 2 possible models in mind for handling incoming requests:
+The load balancer has information about all the running nodes. It also monitors
+three criteria: cost (related to the number of machines running), mean
+prediction time and learning rate. It makes decisions about starting or killing
+machines based on a cost function that relates these three. Measuring the
+learning rate seems not to be a trivial problem, and it is one that will require
+more thinking in our part.
+
+Further, the load balancer also implements a learning algorithm in order to
+predict the future load (instead of waiting for bad prediction time sto happen),
+given the load in the previous $t$ timestamps, in a manner similar to
+\cite{jordan}. 
+
+The clients communicate with the load balancer directly. As of now, we have 2 possible
+models in mind for handling incoming requests:
 \begin{itemize}
-\item Master, upon recieving a request, updates the model for load prediction, requests the learner or predictor as per the client request and relays the response back to client. In this model, the master is a potential bottleneck.
-\item Master, upon recieving a request from client, updates the model for load prediction and returns a session and node to client. The client talks to the node directly until the sesion is valid. The master can invalidate the session if the node goes down is overly loaded. After session invalidation, the client contacts master for a new session.
+\item Master, upon recieving a request, updates the model for load prediction,
+requests the learner or predictor as per the client request and relays the
+response back to client. In this model, the master is a potential bottleneck.
+\item Master, upon recieving a request from client, updates the model for load
+prediction and returns a session and node to client. The client talks to the
+node directly until the sesion is valid. The master can invalidate the session
+if the node goes down is overly loaded. After session invalidation, the client
+contacts master for a new session.
 \end{itemize}
 
-Irrespective of the model, the master keeps a list of valid nodes which are up and keeps adding or removing nodes from this list based on load. Master also sends regular heartbeat messages to nodes to check if some node has gone down acts accordingly.
-
+Irrespective of the model, the master keeps a list of valid nodes which are up
+and keeps adding or removing nodes from this list based on load. Master also
+sends regular heartbeat messages to nodes to check if some node has gone down,
+and to check for the response time (in order to estimate the current load on the
+node).
 
 \bibliographystyle{plain}
 \bibliography{references}
