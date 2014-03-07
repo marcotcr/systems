@@ -34,11 +34,18 @@ class Iface:
     """
     pass
 
-  def LearnFromID(self, id):
+  def LearnFromID(self, id, y):
     """
     Parameters:
      - id
+     - y
     """
+    pass
+
+  def AvgPredictionTime(self):
+    pass
+
+  def Test(self):
     pass
 
 
@@ -111,18 +118,20 @@ class Client(Iface):
     self._iprot.readMessageEnd()
     return
 
-  def LearnFromID(self, id):
+  def LearnFromID(self, id, y):
     """
     Parameters:
      - id
+     - y
     """
-    self.send_LearnFromID(id)
+    self.send_LearnFromID(id, y)
     self.recv_LearnFromID()
 
-  def send_LearnFromID(self, id):
+  def send_LearnFromID(self, id, y):
     self._oprot.writeMessageBegin('LearnFromID', TMessageType.CALL, self._seqid)
     args = LearnFromID_args()
     args.id = id
+    args.y = y
     args.write(self._oprot)
     self._oprot.writeMessageEnd()
     self._oprot.trans.flush()
@@ -139,6 +148,40 @@ class Client(Iface):
     self._iprot.readMessageEnd()
     return
 
+  def AvgPredictionTime(self):
+    self.send_AvgPredictionTime()
+    return self.recv_AvgPredictionTime()
+
+  def send_AvgPredictionTime(self):
+    self._oprot.writeMessageBegin('AvgPredictionTime', TMessageType.CALL, self._seqid)
+    args = AvgPredictionTime_args()
+    args.write(self._oprot)
+    self._oprot.writeMessageEnd()
+    self._oprot.trans.flush()
+
+  def recv_AvgPredictionTime(self):
+    (fname, mtype, rseqid) = self._iprot.readMessageBegin()
+    if mtype == TMessageType.EXCEPTION:
+      x = TApplicationException()
+      x.read(self._iprot)
+      self._iprot.readMessageEnd()
+      raise x
+    result = AvgPredictionTime_result()
+    result.read(self._iprot)
+    self._iprot.readMessageEnd()
+    if result.success is not None:
+      return result.success
+    raise TApplicationException(TApplicationException.MISSING_RESULT, "AvgPredictionTime failed: unknown result");
+
+  def Test(self):
+    self.send_Test()
+
+  def send_Test(self):
+    self._oprot.writeMessageBegin('Test', TMessageType.CALL, self._seqid)
+    args = Test_args()
+    args.write(self._oprot)
+    self._oprot.writeMessageEnd()
+    self._oprot.trans.flush()
 
 class Processor(Iface, TProcessor):
   def __init__(self, handler):
@@ -147,6 +190,8 @@ class Processor(Iface, TProcessor):
     self._processMap["Predict"] = Processor.process_Predict
     self._processMap["Learn"] = Processor.process_Learn
     self._processMap["LearnFromID"] = Processor.process_LearnFromID
+    self._processMap["AvgPredictionTime"] = Processor.process_AvgPredictionTime
+    self._processMap["Test"] = Processor.process_Test
 
   def process(self, iprot, oprot):
     (name, type, seqid) = iprot.readMessageBegin()
@@ -190,11 +235,29 @@ class Processor(Iface, TProcessor):
     args.read(iprot)
     iprot.readMessageEnd()
     result = LearnFromID_result()
-    self._handler.LearnFromID(args.id)
+    self._handler.LearnFromID(args.id, args.y)
     oprot.writeMessageBegin("LearnFromID", TMessageType.REPLY, seqid)
     result.write(oprot)
     oprot.writeMessageEnd()
     oprot.trans.flush()
+
+  def process_AvgPredictionTime(self, seqid, iprot, oprot):
+    args = AvgPredictionTime_args()
+    args.read(iprot)
+    iprot.readMessageEnd()
+    result = AvgPredictionTime_result()
+    result.success = self._handler.AvgPredictionTime()
+    oprot.writeMessageBegin("AvgPredictionTime", TMessageType.REPLY, seqid)
+    result.write(oprot)
+    oprot.writeMessageEnd()
+    oprot.trans.flush()
+
+  def process_Test(self, seqid, iprot, oprot):
+    args = Test_args()
+    args.read(iprot)
+    iprot.readMessageEnd()
+    self._handler.Test()
+    return
 
 
 # HELPER FUNCTIONS AND STRUCTURES
@@ -448,15 +511,18 @@ class LearnFromID_args:
   """
   Attributes:
    - id
+   - y
   """
 
   thrift_spec = (
     None, # 0
     (1, TType.I32, 'id', None, None, ), # 1
+    (2, TType.DOUBLE, 'y', None, None, ), # 2
   )
 
-  def __init__(self, id=None,):
+  def __init__(self, id=None, y=None,):
     self.id = id
+    self.y = y
 
   def read(self, iprot):
     if iprot.__class__ == TBinaryProtocol.TBinaryProtocolAccelerated and isinstance(iprot.trans, TTransport.CReadableTransport) and self.thrift_spec is not None and fastbinary is not None:
@@ -472,6 +538,11 @@ class LearnFromID_args:
           self.id = iprot.readI32();
         else:
           iprot.skip(ftype)
+      elif fid == 2:
+        if ftype == TType.DOUBLE:
+          self.y = iprot.readDouble();
+        else:
+          iprot.skip(ftype)
       else:
         iprot.skip(ftype)
       iprot.readFieldEnd()
@@ -485,6 +556,10 @@ class LearnFromID_args:
     if self.id is not None:
       oprot.writeFieldBegin('id', TType.I32, 1)
       oprot.writeI32(self.id)
+      oprot.writeFieldEnd()
+    if self.y is not None:
+      oprot.writeFieldBegin('y', TType.DOUBLE, 2)
+      oprot.writeDouble(self.y)
       oprot.writeFieldEnd()
     oprot.writeFieldStop()
     oprot.writeStructEnd()
@@ -528,6 +603,149 @@ class LearnFromID_result:
       oprot.trans.write(fastbinary.encode_binary(self, (self.__class__, self.thrift_spec)))
       return
     oprot.writeStructBegin('LearnFromID_result')
+    oprot.writeFieldStop()
+    oprot.writeStructEnd()
+
+  def validate(self):
+    return
+
+
+  def __repr__(self):
+    L = ['%s=%r' % (key, value)
+      for key, value in self.__dict__.iteritems()]
+    return '%s(%s)' % (self.__class__.__name__, ', '.join(L))
+
+  def __eq__(self, other):
+    return isinstance(other, self.__class__) and self.__dict__ == other.__dict__
+
+  def __ne__(self, other):
+    return not (self == other)
+
+class AvgPredictionTime_args:
+
+  thrift_spec = (
+  )
+
+  def read(self, iprot):
+    if iprot.__class__ == TBinaryProtocol.TBinaryProtocolAccelerated and isinstance(iprot.trans, TTransport.CReadableTransport) and self.thrift_spec is not None and fastbinary is not None:
+      fastbinary.decode_binary(self, iprot.trans, (self.__class__, self.thrift_spec))
+      return
+    iprot.readStructBegin()
+    while True:
+      (fname, ftype, fid) = iprot.readFieldBegin()
+      if ftype == TType.STOP:
+        break
+      else:
+        iprot.skip(ftype)
+      iprot.readFieldEnd()
+    iprot.readStructEnd()
+
+  def write(self, oprot):
+    if oprot.__class__ == TBinaryProtocol.TBinaryProtocolAccelerated and self.thrift_spec is not None and fastbinary is not None:
+      oprot.trans.write(fastbinary.encode_binary(self, (self.__class__, self.thrift_spec)))
+      return
+    oprot.writeStructBegin('AvgPredictionTime_args')
+    oprot.writeFieldStop()
+    oprot.writeStructEnd()
+
+  def validate(self):
+    return
+
+
+  def __repr__(self):
+    L = ['%s=%r' % (key, value)
+      for key, value in self.__dict__.iteritems()]
+    return '%s(%s)' % (self.__class__.__name__, ', '.join(L))
+
+  def __eq__(self, other):
+    return isinstance(other, self.__class__) and self.__dict__ == other.__dict__
+
+  def __ne__(self, other):
+    return not (self == other)
+
+class AvgPredictionTime_result:
+  """
+  Attributes:
+   - success
+  """
+
+  thrift_spec = (
+    (0, TType.DOUBLE, 'success', None, None, ), # 0
+  )
+
+  def __init__(self, success=None,):
+    self.success = success
+
+  def read(self, iprot):
+    if iprot.__class__ == TBinaryProtocol.TBinaryProtocolAccelerated and isinstance(iprot.trans, TTransport.CReadableTransport) and self.thrift_spec is not None and fastbinary is not None:
+      fastbinary.decode_binary(self, iprot.trans, (self.__class__, self.thrift_spec))
+      return
+    iprot.readStructBegin()
+    while True:
+      (fname, ftype, fid) = iprot.readFieldBegin()
+      if ftype == TType.STOP:
+        break
+      if fid == 0:
+        if ftype == TType.DOUBLE:
+          self.success = iprot.readDouble();
+        else:
+          iprot.skip(ftype)
+      else:
+        iprot.skip(ftype)
+      iprot.readFieldEnd()
+    iprot.readStructEnd()
+
+  def write(self, oprot):
+    if oprot.__class__ == TBinaryProtocol.TBinaryProtocolAccelerated and self.thrift_spec is not None and fastbinary is not None:
+      oprot.trans.write(fastbinary.encode_binary(self, (self.__class__, self.thrift_spec)))
+      return
+    oprot.writeStructBegin('AvgPredictionTime_result')
+    if self.success is not None:
+      oprot.writeFieldBegin('success', TType.DOUBLE, 0)
+      oprot.writeDouble(self.success)
+      oprot.writeFieldEnd()
+    oprot.writeFieldStop()
+    oprot.writeStructEnd()
+
+  def validate(self):
+    return
+
+
+  def __repr__(self):
+    L = ['%s=%r' % (key, value)
+      for key, value in self.__dict__.iteritems()]
+    return '%s(%s)' % (self.__class__.__name__, ', '.join(L))
+
+  def __eq__(self, other):
+    return isinstance(other, self.__class__) and self.__dict__ == other.__dict__
+
+  def __ne__(self, other):
+    return not (self == other)
+
+class Test_args:
+
+  thrift_spec = (
+  )
+
+  def read(self, iprot):
+    if iprot.__class__ == TBinaryProtocol.TBinaryProtocolAccelerated and isinstance(iprot.trans, TTransport.CReadableTransport) and self.thrift_spec is not None and fastbinary is not None:
+      fastbinary.decode_binary(self, iprot.trans, (self.__class__, self.thrift_spec))
+      return
+    iprot.readStructBegin()
+    while True:
+      (fname, ftype, fid) = iprot.readFieldBegin()
+      if ftype == TType.STOP:
+        break
+      else:
+        iprot.skip(ftype)
+      iprot.readFieldEnd()
+    iprot.readStructEnd()
+
+  def write(self, oprot):
+    if oprot.__class__ == TBinaryProtocol.TBinaryProtocolAccelerated and self.thrift_spec is not None and fastbinary is not None:
+      oprot.trans.write(fastbinary.encode_binary(self, (self.__class__, self.thrift_spec)))
+      return
+    oprot.writeStructBegin('Test_args')
     oprot.writeFieldStop()
     oprot.writeStructEnd()
 
