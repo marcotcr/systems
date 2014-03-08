@@ -19,12 +19,13 @@ import argparse
 import numpy as np
 import os
 class WorkerHandler:
-  def __init__(self, prediction_time, learn_time):
+  def __init__(self, prediction_time, learn_time, hist_instances):
     self.p_wait = prediction_time
     self.l_wait = learn_time
     self.prediction_time = 0
     self.counter = 0
-    self.prediction_times = np.zeros(15)
+    self.prediction_times_count = hist_instances
+    self.prediction_times = np.zeros(self.prediction_times_count)
     self.a = 0
     pass
 
@@ -34,7 +35,7 @@ class WorkerHandler:
     time.sleep(self.p_wait)
     b = time.time()
     self.prediction_times[self.counter] = b - a
-    self.counter = (self.counter + 1) % 15
+    self.counter = (self.counter + 1) % self.prediction_times_count
     return 1
     pass
   def Learn(self, x, y):
@@ -42,7 +43,7 @@ class WorkerHandler:
     pass
   def AvgPredictionTime(self):
     print 'AvgPredictionTime'
-    return sum(self.prediction_times) / 15
+    return sum(self.prediction_times) / self.prediction_times_count
   def Test(self):
     #print 'Test'
     self.a += 1
@@ -56,7 +57,7 @@ def main():
   args = parser.parse_args()
 
   port = args.port
-  handler = WorkerHandler(.5, .2)
+  handler = WorkerHandler(.5, .2, 15)
   processor = Worker.Processor(handler)
   transport = TSocket.TServerSocket(port=port)
   tfactory = TTransport.TBufferedTransportFactory()
