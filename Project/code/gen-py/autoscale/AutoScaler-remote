@@ -14,10 +14,8 @@ from thrift.transport import TTransport
 from thrift.transport import TSocket
 from thrift.transport import THttpClient
 from thrift.protocol import TBinaryProtocol
-import time
-import random
 
-from autoscale import Worker
+from autoscale import AutoScaler
 from autoscale.ttypes import *
 
 if len(sys.argv) <= 1 or sys.argv[1] == '--help':
@@ -25,11 +23,7 @@ if len(sys.argv) <= 1 or sys.argv[1] == '--help':
   print 'Usage: ' + sys.argv[0] + ' [-h host[:port]] [-u url] [-f[ramed]] function [arg1 [arg2...]]'
   print ''
   print 'Functions:'
-  print '  double Predict(i32 id, string x)'
-  print '  void Learn(string x, double y)'
-  print '  void LearnFromID(i32 id, double y)'
-  print '  double AvgPredictionTime()'
-  print '  void Test()'
+  print '  void HeartBeat( state)'
   print ''
   sys.exit(0)
 
@@ -78,52 +72,14 @@ else:
   else:
     transport = TTransport.TBufferedTransport(socket)
 protocol = TBinaryProtocol.TBinaryProtocol(transport)
-client = Worker.Client(protocol)
+client = AutoScaler.Client(protocol)
 transport.open()
 
-if cmd == 'Predict':
-  if len(args) != 2:
-    print 'Predict requires 2 args'
+if cmd == 'HeartBeat':
+  if len(args) != 1:
+    print 'HeartBeat requires 1 args'
     sys.exit(1)
-  while True:
-    transport.open()
-    a = time.time()
-    pp.pprint(client.Predict(eval(args[0]),args[1],))
-    b = time.time()
-    transport.close()
-    print b-a
-
-elif cmd == 'Learn':
-  if len(args) != 2:
-    print 'Learn requires 2 args'
-    sys.exit(1)
-  pp.pprint(client.Learn(args[0],eval(args[1]),))
-
-elif cmd == 'LearnFromID':
-  if len(args) != 2:
-    print 'LearnFromID requires 2 args'
-    sys.exit(1)
-  pp.pprint(client.LearnFromID(eval(args[0]),eval(args[1]),))
-
-elif cmd == 'AvgPredictionTime':
-  if len(args) != 0:
-    print 'AvgPredictionTime requires 0 args'
-    sys.exit(1)
-  pp.pprint(client.AvgPredictionTime())
-
-elif cmd == 'Test':
-  if len(args) != 0:
-    print 'Test requires 0 args'
-    sys.exit(1)
-  count = 0
-  a = time.time()
-  for i in range(10000):
-    # transport.open()
-    client.Test()
-    count += 1
-    # transport.close()
-  b = time.time()
-  print 10000 / (b - a)
+  pp.pprint(client.HeartBeat(eval(args[0]),))
 
 else:
   print 'Unrecognized method %s' % cmd

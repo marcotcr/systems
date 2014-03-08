@@ -15,8 +15,8 @@ from thrift.transport import TSocket
 from thrift.transport import THttpClient
 from thrift.protocol import TBinaryProtocol
 
-from ml import MLEngine
-from ml.ttypes import *
+from autoscale import Worker
+from autoscale.ttypes import *
 
 if len(sys.argv) <= 1 or sys.argv[1] == '--help':
   print ''
@@ -76,7 +76,7 @@ else:
   else:
     transport = TTransport.TBufferedTransport(socket)
 protocol = TBinaryProtocol.TBinaryProtocol(transport)
-client = MLEngine.Client(protocol)
+client = Worker.Client(protocol)
 transport.open()
 
 if cmd == 'Predict':
