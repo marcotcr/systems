@@ -18,36 +18,40 @@ import argparse
 import numpy as np
 import os
 import random
+import threading
+from itertools import cycle
 class LoadBalancerHandler:
   def __init__(self):
-    self.node_quotas = {}
+    self.node_times = {}
     self.nodelist = []
-    self.current_node = 0
+    self.n_cycle = cycle(range(0))
     self.n = 0
+    self.n_threads = 10
     pass
 
+  def Finish(self, node):
+    time.sleep(self.node_times[node])
+    self.n_running[node] -= 1
   def GetNode(self):
     print 'GetNode'
-    if not self.nodelist:
-      self.SetNodes(self.previous_state)
-    return_ = self.nodelist[self.current_node]
-    self.node_quotas[return_] -= 1
-    if self.node_quotas[return_] == 0:
-      self.nodelist.remove(return_)
-      if self.nodelist:
-        self.current_node = self.current_node % len(self.nodelist)
-    else:
-      self.current_node = (self.current_node + 1) % len(self.nodelist)
+    node = self.nodelist[self.n_cycle.next()]
+    while self.n_running[node] >= self.n_threads:
+      node = self.nodelist[self.n_cycle.next()]
+    print 'returning ', node, self.n_running[node]
+    self.n_running[node] += 1
     self.n += 1
-    return return_
+    t = threading.Thread(target=self.Finish, args=(node,))
+    t.start()
+    return node
   def SetNodes(self, state):
     print 'SetNodes', state
-    self.node_quotas = {}
+    self.node_times = {}
     self.previous_state = state
     for node, quota in state.iteritems():
-      self.node_quotas[node] = int(quota)
-    self.nodelist = self.node_quotas.keys()
-    self.current_node = 0
+      self.node_times[node] = float(quota)
+    self.nodelist = self.node_times.keys()
+    self.n_running = collections.defaultdict(lambda: 0)
+    self.n_cycle = cycle(range(len(self.nodelist)))
   def NumRequests(self):
     return self.n
     print 'SetNodes', state

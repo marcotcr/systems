@@ -94,7 +94,7 @@ class AutoScaler:
         print 'Latency', node.AvgPredictionLatency()
       time.sleep(5)
   def SetStuff(self):
-    self.load_balancer.SetNodes({node.name: '500' for node in self.nodes})
+    self.load_balancer.SetNodes({'localhost:6666': '1', 'localhost:5555':'5'})
   def LoadBalancerLoop(self):
     while True:
       self.SetStuff()
