@@ -61,9 +61,9 @@ class AutoScaler:
         if self.stats[node.name] == -1:
           pass
         print 'Stats', node.name, self.stats[node.name]
-      time.sleep(2)
+      time.sleep(30)
   def SetStuff(self):
-    self.load_balancer.SetNodes({'5:1' : '2', 'dum': '5'})
+    self.load_balancer.SetNodes({node.name: '500' for node in self.nodes})
   def LoadBalancerLoop(self):
     while True:
       self.SetStuff()

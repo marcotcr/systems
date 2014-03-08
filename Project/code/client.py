@@ -3,6 +3,7 @@
 import sys
 sys.path.append('gen-py')
 sys.path.append('gen-py/autoscale')
+import time
 
 import pprint
 import argparse
@@ -23,7 +24,7 @@ if __name__ == '__main__':
   
   lb_port = 9090
 
-  parts = args.host.split(':')
+  parts = args.loadbalancer.split(':')
   lb_host = parts[0]
   if len(parts) > 1:
     lb_port = int(parts[1])
@@ -51,7 +52,7 @@ if __name__ == '__main__':
 
     print 'Calling learn'
     start = time.time()
-    node_client.Learn('something', 1.00)
+    node_client.Test()
     end = time.time()
     print 'Learn took: ', end-start
     
