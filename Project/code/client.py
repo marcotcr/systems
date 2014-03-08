@@ -56,11 +56,11 @@ if __name__ == '__main__':
     end = time.time()
     print 'Learn took: ', end-start
     
-    print 'Calling predict'
-    start = time.time()
-    node_client.Predict(1, 'something')
-    end = time.time()
-    print 'Predict took: ', end-start
+    # print 'Calling predict'
+    # start = time.time()
+    # node_client.Predict(1, 'something')
+    # end = time.time()
+    # print 'Predict took: ', end-start
     
     node_transport.close()
     lb_transport.close()

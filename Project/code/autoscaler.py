@@ -2,6 +2,7 @@ from __future__ import division
 import sys
 sys.path.append('gen-py/autoscale')
 sys.path.append('gen-py/')
+from itertools import cycle
  
 import AutoScaler
 import Worker
@@ -29,16 +30,38 @@ class Node:
     self.transport = TTransport.TBufferedTransport(socket)
     protocol = TBinaryProtocol.TBinaryProtocol(self.transport)
     self.client = Worker.Client(protocol)
+    self.prediction_times = np.zeros(10)
+    self.p_cycle = cycle(range(10))
+    self.avg_prediction_time = 0
+    self.is_down = False
     try:
       self.transport.open()
     except:
-      pass
+      self.is_down = True
   def AvgPredictionTime(self):
     try:
       self.transport.open()
-      return self.client.AvgPredictionTime()
+      self.avg_prediction_time = self.client.AvgPredictionTime()
+      self.is_down = False
+      return self.avg_prediction_time
     except:
+      self.is_down = True
       return -1
+  def PingPrediction(self):
+    a = time.time()
+    try:
+      self.transport.open()
+      self.client.Predict(1, 'a')
+      self.is_down = False
+      b = time.time()
+      self.prediction_times[self.p_cycle.next()] = b - a
+    except:
+      self.is_down = True
+  def AvgPredictionLatency(self):
+    return np.mean(self.prediction_times.nonzero())
+  def IsDown(self):
+    return self.is_down
+
 
 class AutoScaler:
   def __init__(self, load_balancer, possible_nodes):
@@ -47,21 +70,25 @@ class AutoScaler:
     self.nodes.append(Node(self.possible_nodes[0]))
     self.load_balancer = load_balancer
     self.possible_nodes = possible_nodes
-    self.stats = {}
     t = threading.Thread(target=self.LoadBalancerLoop)
     t.start()
-    t2 = threading.Thread(target=self.NodesLoop)
+    t2 = threading.Thread(target=self.AvgPredictionLoop)
     t2.start()
+    t3 = threading.Thread(target=self.PredictionTimeLoop)
+    t3.start()
 
-  def NodesLoop(self):
+  def AvgPredictionLoop(self):
     while True:
       for node in self.nodes:
-        self.stats[node.name] = node.AvgPredictionTime()
-        # Failed node
-        if self.stats[node.name] == -1:
-          pass
-        print 'Stats', node.name, self.stats[node.name]
+        node.AvgPredictionTime()
+        print 'Stats', node.name, node.avg_prediction_time
       time.sleep(30)
+  def PredictionTimeLoop(self):
+    while True:
+      for node in self.nodes:
+        node.PingPrediction()
+        print 'Latency', node.AvgPredictionLatency()
+      time.sleep(5)
   def SetStuff(self):
     self.load_balancer.SetNodes({node.name: '500' for node in self.nodes})
   def LoadBalancerLoop(self):
