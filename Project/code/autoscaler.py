@@ -62,9 +62,22 @@ class Node:
   def IsDown(self):
     return self.is_down
 
+class NaiveStrategy:
+  def __init__(self):
+    pass
+  def Start(self, autoscaler):
+    # Start CHECK SLA loop
+    t = threading.Thread(target=self.CheckSLALoop)
+    pass
+  def CheckSLALoop(self):
+    while True:
+      sleep(1)
+  def NewState(self):
+    # Maybe do a lock here. Think.
+    return {}
 
 class AutoScaler:
-  def __init__(self, load_balancer, possible_nodes):
+  def __init__(self, load_balancer, possible_nodes, SLA, strategy):
     self.possible_nodes = possible_nodes
     self.nodes = []
     self.nodes.append(Node(self.possible_nodes[0]))
@@ -72,6 +85,9 @@ class AutoScaler:
     self.possible_nodes = possible_nodes
     self.num_requests = [0] * 15
     self.previous_num_requests = 0
+    self.SLA = SLA
+    self.strategy = strategy
+    self.strategy.Start(self)
     t = threading.Thread(target=self.LoadBalancerLoop)
     t.start()
     t2 = threading.Thread(target=self.AvgPredictionLoop)
@@ -95,6 +111,7 @@ class AutoScaler:
       time.sleep(5)
   def SetStuff(self):
     self.load_balancer.SetNodes({'localhost:6666': '1', 'localhost:5555':'5'})
+    self.load_balancer.SetNodes(self.strategy.NewState())
   def LoadBalancerLoop(self):
     while True:
       self.SetStuff()
@@ -124,7 +141,8 @@ def main():
   client = LoadBalancer.Client(protocol)
   transport.open()
   
-  a = AutoScaler(client, args.nodes)
+  SLA = .5
+  a = AutoScaler(client, args.nodes, SLA)
 
   print "done!"
 if __name__ == '__main__':

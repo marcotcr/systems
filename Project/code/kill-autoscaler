@@ -1,0 +1,2 @@
+#!/bin/sh
+ps aux | grep autoscaler | grep Cellar | awk '{print $2}' | xargs kill -9
