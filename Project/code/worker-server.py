@@ -4,6 +4,7 @@ sys.path.append('gen-py/autoscale')
 sys.path.append('gen-py/')
  
 import Worker
+import AutoScaler
 from autoscale.ttypes import *
 from autoscale import Worker
  

@@ -10,6 +10,3 @@ service Worker {
   double AvgPredictionTime(),
   oneway void Test()
 }
-service AutoScaler {
-  void HeartBeat(1:map<string, string> state)
-}

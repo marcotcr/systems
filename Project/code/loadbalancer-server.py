@@ -28,8 +28,7 @@ class LoadBalancerHandler:
   def GetNode(self):
     print 'GetNode'
     if not self.nodelist:
-      print 'Returning random'
-      return random.choice(self.node_quotas.keys())
+      self.SetNodes(self.previous_state)
     return_ = self.nodelist[self.current_node]
     self.node_quotas[return_] -= 1
     if self.node_quotas[return_] == 0:
@@ -42,6 +41,7 @@ class LoadBalancerHandler:
   def SetNodes(self, state):
     print 'SetNodes', state
     self.node_quotas = {}
+    self.previous_state = state
     for node, quota in state.iteritems():
       self.node_quotas[node] = int(quota)
     self.nodelist = self.node_quotas.keys()
