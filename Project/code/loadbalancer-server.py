@@ -23,6 +23,7 @@ class LoadBalancerHandler:
     self.node_quotas = {}
     self.nodelist = []
     self.current_node = 0
+    self.n = 0
     pass
 
   def GetNode(self):
@@ -37,6 +38,7 @@ class LoadBalancerHandler:
         self.current_node = self.current_node % len(self.nodelist)
     else:
       self.current_node = (self.current_node + 1) % len(self.nodelist)
+    self.n += 1
     return return_
   def SetNodes(self, state):
     print 'SetNodes', state
@@ -46,6 +48,9 @@ class LoadBalancerHandler:
       self.node_quotas[node] = int(quota)
     self.nodelist = self.node_quotas.keys()
     self.current_node = 0
+  def NumRequests(self):
+    return self.n
+    print 'SetNodes', state
     
 def main():
   parser = argparse.ArgumentParser(description='TODO')

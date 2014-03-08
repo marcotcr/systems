@@ -58,7 +58,7 @@ class Node:
     except:
       self.is_down = True
   def AvgPredictionLatency(self):
-    return np.mean(self.prediction_times.nonzero())
+    return np.mean(self.prediction_times)
   def IsDown(self):
     return self.is_down
 
@@ -70,12 +70,16 @@ class AutoScaler:
     self.nodes.append(Node(self.possible_nodes[0]))
     self.load_balancer = load_balancer
     self.possible_nodes = possible_nodes
+    self.num_requests = [0] * 15
+    self.previous_num_requests = 0
     t = threading.Thread(target=self.LoadBalancerLoop)
     t.start()
     t2 = threading.Thread(target=self.AvgPredictionLoop)
     t2.start()
     t3 = threading.Thread(target=self.PredictionTimeLoop)
     t3.start()
+    t4 = threading.Thread(target=self.NumRequestsLoop)
+    t4.start()
 
   def AvgPredictionLoop(self):
     while True:
@@ -95,6 +99,16 @@ class AutoScaler:
     while True:
       self.SetStuff()
       time.sleep(60)
+  def NumRequestsLoop(self):
+    while(True):
+      num_requests = self.load_balancer.NumRequests()
+      temp = num_requests - self.previous_num_requests
+      self.previous_num_requests = num_requests
+      self.num_requests.append(temp)
+      self.num_requests.pop(0)
+      print 'Requests:', self.num_requests
+      time.sleep(5)
+
     
 def main():
   parser = argparse.ArgumentParser(description='TODO')

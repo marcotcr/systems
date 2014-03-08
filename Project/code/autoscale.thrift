@@ -1,6 +1,7 @@
 service LoadBalancer {
   string GetNode(),
-  void SetNodes(1:map<string, string> state)
+  void SetNodes(1:map<string, string> state),
+  i32 NumRequests()
 }
 service Worker {
   double Predict(1:i32 id, 2:string x),
