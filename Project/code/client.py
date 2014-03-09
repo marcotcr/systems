@@ -4,7 +4,7 @@ import sys
 sys.path.append('gen-py')
 sys.path.append('gen-py/autoscale')
 import time
-
+import numpy as np
 import pprint
 import argparse
 from thrift.transport import TTransport
@@ -29,38 +29,48 @@ if __name__ == '__main__':
   if len(parts) > 1:
     lb_port = int(parts[1])
 
-  for i in range(args.times):
-    lb_socket = TSocket.TSocket(lb_host, lb_port)
-    lb_transport = TTransport.TBufferedTransport(lb_socket)
-    lb_protocol = TBinaryProtocol.TBinaryProtocol(lb_transport)
-    lb_client = LoadBalancer.Client(lb_protocol)
-    lb_transport.open()
-    
-    node_port = 9090
-    node = lb_client.GetNode()
+  num_requests = [200]*10
+  sigma = 100
+  mu = 40
+  bins = np.linspace(-90, 170, 100) 
+  num_ranges = (1/(sigma * np.sqrt(2 * np.pi)) * np.exp( - (bins - mu)**2 / (2 * sigma**2)))*125000
+  num_requests.extend(num_ranges)
+  num_requests.extend([200]*10)
 
-    node_parts = node.split(':')
-    node_host = node_parts[0]
-    if len(node_parts) > 1:
-      node_port = int(node_parts[1])
+  for times in num_requests:
+    for i in range(int(times)):
+      lb_socket = TSocket.TSocket(lb_host, lb_port)
+      lb_transport = TTransport.TBufferedTransport(lb_socket)
+      lb_protocol = TBinaryProtocol.TBinaryProtocol(lb_transport)
+      lb_client = LoadBalancer.Client(lb_protocol)
+      lb_transport.open()
+      
+      node_port = 9090
+      node = lb_client.GetNode()
 
-    node_socket = TSocket.TSocket(node_host, node_port)
-    node_transport = TTransport.TBufferedTransport(node_socket)
-    node_protocol = TBinaryProtocol.TBinaryProtocol(node_transport)
-    node_client = Worker.Client(node_protocol)
-    node_transport.open()
+      node_parts = node.split(':')
+      node_host = node_parts[0]
+      if len(node_parts) > 1:
+        node_port = int(node_parts[1])
 
-    print 'Calling learn'
-    start = time.time()
-    node_client.Test()
-    end = time.time()
-    print 'Learn took: ', end-start
-    
-    # print 'Calling predict'
-    # start = time.time()
-    # node_client.Predict(1, 'something')
-    # end = time.time()
-    # print 'Predict took: ', end-start
-    
-    node_transport.close()
-    lb_transport.close()
+      node_socket = TSocket.TSocket(node_host, node_port)
+      node_transport = TTransport.TBufferedTransport(node_socket)
+      node_protocol = TBinaryProtocol.TBinaryProtocol(node_transport)
+      node_client = Worker.Client(node_protocol)
+      node_transport.open()
+
+      print 'Calling learn'
+      start = time.time()
+      node_client.Test()
+      end = time.time()
+      print 'Learn took: ', end-start
+      
+      # print 'Calling predict'
+      # start = time.time()
+      # node_client.Predict(1, 'something')
+      # end = time.time()
+      # print 'Predict took: ', end-start
+      
+      node_transport.close()
+      lb_transport.close()
+    time.sleep(1)
