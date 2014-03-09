@@ -25,7 +25,7 @@ class WorkerHandler:
     self.prediction_time = 0
     self.counter = 0
     self.prediction_times_count = hist_instances
-    self.prediction_times = np.zeros(self.prediction_times_count)
+    self.prediction_times = np.zeros(self.prediction_times_count) + prediction_time
     self.a = 0
     pass
 
@@ -45,8 +45,9 @@ class WorkerHandler:
     print 'AvgPredictionTime'
     return sum(self.prediction_times) / self.prediction_times_count
   def Test(self):
-    #print 'Test'
+    print 'Test'
     self.a += 1
+    time.sleep(self.p_wait)
     if self.a % 1000 == 0:
       print self.a
     pass
@@ -57,14 +58,14 @@ def main():
   args = parser.parse_args()
 
   port = args.port
-  handler = WorkerHandler(.5, .2, 15)
+  handler = WorkerHandler(.05, .2, 15)
   processor = Worker.Processor(handler)
   transport = TSocket.TServerSocket(port=port)
   tfactory = TTransport.TBufferedTransportFactory()
   pfactory = TBinaryProtocol.TBinaryProtocolFactory()
   
   server = TServer.TThreadPoolServer(processor, transport, tfactory, pfactory)
-  server.setNumThreads(2)
+  server.setNumThreads(10)
   #server = TServer.TThreadedServer(processor, transport, tfactory, pfactory)
    
    
