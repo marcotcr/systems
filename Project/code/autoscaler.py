@@ -156,6 +156,7 @@ class AutoScaler:
     self.p_cycle = cycle(range(10))
 
     self.start_time = time.time()
+    self.nodes_log = open('/tmp/nodes', 'w', 0)
     self.num_requests = [0] * 15
     self.previous_num_requests = 0
     self.SLA = SLA
@@ -178,6 +179,7 @@ class AutoScaler:
         print 'Stats', node.name, node.avg_prediction_time
       time.sleep(30)
   def PredictionTimeLoop(self):
+    file_ = open('/tmp/pred_time', 'w', 0)
     while True:
       self.transport.open()
       try:
@@ -198,11 +200,13 @@ class AutoScaler:
       except:
         print 'Timeout!'
         self.prediction_times[self.p_cycle.next()] = 10
+      file_.write('%s %s\n' % (time.time() - self.start_time, np.mean(self.prediction_times)))
       time.sleep(5)
   def SetStuff(self):
     # self.load_balancer.SetNodes({'localhost:6666': '1', 'localhost:5555':'5'})
     state = self.strategy.NewState()
     print 'New state:', state
+    self.nodes_log.write('%s %s\n' % (time.time() - self.start_time, len(state)))
     self.load_balancer.SetNodes(state)
   def LoadBalancerLoop(self):
     while True:
