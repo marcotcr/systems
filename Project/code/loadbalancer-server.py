@@ -33,11 +33,10 @@ class LoadBalancerHandler:
     time.sleep(self.node_times[node])
     self.n_running[node] -= 1
   def GetNode(self):
-    print 'GetNode'
+    # print 'GetNode'
     node = self.nodelist[self.n_cycle.next()]
     while self.n_running[node] >= self.n_threads:
       node = self.nodelist[self.n_cycle.next()]
-    print 'returning ', node, self.n_running[node]
     self.n_running[node] += 1
     self.n += 1
     t = threading.Thread(target=self.Finish, args=(node,))
@@ -54,7 +53,6 @@ class LoadBalancerHandler:
     self.n_cycle = cycle(range(len(self.nodelist)))
   def NumRequests(self):
     return self.n
-    print 'SetNodes', state
     
 def main():
   parser = argparse.ArgumentParser(description='TODO')
