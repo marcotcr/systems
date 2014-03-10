@@ -33,7 +33,6 @@ class Node:
     protocol = TBinaryProtocol.TBinaryProtocol(self.transport)
     self.client = Worker.Client(protocol)
     self.avg_prediction_time = 0
-    self.PingAvgPredictionTime()
     self.is_down = False
     try:
       self.transport.open()
@@ -81,7 +80,8 @@ class NaiveStrategy:
     pass
   def StartNewNode(self):
     print 'Starting a new node'
-    time.sleep(30)
+    #TODO: I'm assuming a node starts instantly
+    #time.sleep(30)
     self.state_lock.acquire()
     possible_nodes = [x for x in self.autoscaler.possible_nodes if x not in self.autoscaler.nodes]
     if not possible_nodes:
@@ -94,6 +94,8 @@ class NaiveStrategy:
 
   def StopNode(self):
     print 'Stopping node'
+    if len(self.autoscaler.nodes) == 1:
+      return
     self.state_lock.acquire()
     self.nodes_to_remove.append(self.autoscaler.nodes[-1])
     self.state_lock.release()
@@ -101,7 +103,7 @@ class NaiveStrategy:
 
   def CheckSLALoop(self):
     while True:
-      time.sleep(5)
+      time.sleep(60)
       mean_time = np.mean(self.autoscaler.prediction_times)
       print 'CHECK mean time:', mean_time, 'SLA:', self.autoscaler.SLA
       if mean_time > self.autoscaler.SLA:
@@ -163,7 +165,7 @@ class AutoScaler:
     self.strategy = strategy
     self.strategy.Start(self)
     self.SetStuff()
-    t = threading.Thread(target=self.LoadBalancerLoop)
+    # t = threading.Thread(target=self.LoadBalancerLoop)
     # t.start()
     t2 = threading.Thread(target=self.AvgPredictionLoop)
     t2.start()
@@ -187,9 +189,11 @@ class AutoScaler:
         self.transport.close()
       except:
         print 'Could not talk to load balancer!'
+        # TODO: THink about timeout time
         self.prediction_times[self.p_cycle.next()] = 10
-        return
+        continue
       try:
+        # TODO: Maybe this here should be SLA
         node = Node(node_address, timeout=1000)
         prediction_time = node.PingPrediction()
         if prediction_time:
@@ -200,7 +204,7 @@ class AutoScaler:
       except:
         print 'Timeout!'
         self.prediction_times[self.p_cycle.next()] = 10
-      file_.write('%s %s\n' % (time.time() - self.start_time, np.mean(self.prediction_times)))
+      file_.write('%s %s %s\n' % (time.time() - self.start_time, np.mean(self.prediction_times), ','.join(map(str, self.prediction_times))))
       time.sleep(5)
   def SetStuff(self):
     # self.load_balancer.SetNodes({'localhost:6666': '1', 'localhost:5555':'5'})
@@ -213,12 +217,15 @@ class AutoScaler:
       self.SetStuff()
       time.sleep(60)
   def NumRequestsLoop(self):
+    out = open('/tmp/requests', 'w', 0)
+    start_time = time.time()
     while(True):
       num_requests = self.load_balancer.NumRequests()
       temp = num_requests - self.previous_num_requests
       self.previous_num_requests = num_requests
       self.num_requests.append(temp)
       self.num_requests.pop(0)
+      out.write('%s %s\n' % (time.time() - start_time, self.previous_num_requests))
       # print 'Requests:', self.num_requests
       time.sleep(5)
 

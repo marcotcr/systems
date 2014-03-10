@@ -45,7 +45,7 @@ class WorkerHandler:
     print 'AvgPredictionTime'
     return sum(self.prediction_times) / self.prediction_times_count
   def Test(self):
-    print 'Test'
+    # print 'Test'
     self.a += 1
     time.sleep(self.p_wait)
     if self.a % 1000 == 0:
