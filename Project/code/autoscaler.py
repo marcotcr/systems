@@ -140,6 +140,7 @@ class AutoScaler:
       if node.IsDown():
         print 'NODE ', node.name, ' IS DOWN! ERROR!'
         quit()
+    print 'Starting...'
     self.nodes = []
     self.nodes.append(self.possible_nodes[0])
     # this load balancer is always open, to check for the number of requests and
@@ -183,7 +184,9 @@ class AutoScaler:
   def PredictionTimeLoop(self):
     file_ = open('/tmp/pred_time', 'w', 0)
     while True:
+      start = time.time()
       self.transport.open()
+      node_address = None
       try:
         node_address = self.load_balancer2.GetNode()
         self.transport.close()
@@ -191,19 +194,20 @@ class AutoScaler:
         print 'Could not talk to load balancer!'
         # TODO: THink about timeout time
         self.prediction_times[self.p_cycle.next()] = 10
-        continue
-      try:
-        # TODO: Maybe this here should be SLA
-        node = Node(node_address, timeout=1000)
-        prediction_time = node.PingPrediction()
-        if prediction_time:
+      if node_address:
+        try:
+          # TODO: Maybe this here should be SLA
+          node = Node(node_address, timeout=1000)
+          print 'Got node ', node.name, 
+          if node.PingPrediction():
+            prediction_time = time.time() - start
+          else:
+            prediction_time = 10
           self.prediction_times[self.p_cycle.next()] = prediction_time
-        else:
+          print 'Prediction_time', prediction_time
+        except:
+          print 'Timeout!'
           self.prediction_times[self.p_cycle.next()] = 10
-        print 'Prediction_time', prediction_time
-      except:
-        print 'Timeout!'
-        self.prediction_times[self.p_cycle.next()] = 10
       file_.write('%s %s %s\n' % (time.time() - self.start_time, np.mean(self.prediction_times), ','.join(map(str, self.prediction_times))))
       time.sleep(5)
   def SetStuff(self):
