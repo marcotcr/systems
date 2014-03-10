@@ -74,8 +74,8 @@ if __name__ == '__main__':
   num_ranges = (1/(sigma * np.sqrt(2 * np.pi)) * np.exp( - (bins - mu)**2 / (2 * sigma**2)))*125000
   num_requests.extend(num_ranges)
   num_requests.extend([50]*10)
-  num_requests.extend(num_requests[:])
-  num_requests.extend(num_requests[:])
+  #num_requests.extend(num_requests[:])
+  #num_requests.extend(num_requests[:])
   for times in num_requests:
     print int(times)
     start = time.time()
