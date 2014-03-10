@@ -18,41 +18,48 @@ from autoscale.ttypes import *
 import threading
 
 def request(lb_host, lb_port):
-  lb_socket = TSocket.TSocket(lb_host, lb_port)
-  lb_transport = TTransport.TBufferedTransport(lb_socket)
-  lb_protocol = TBinaryProtocol.TBinaryProtocol(lb_transport)
-  lb_client = LoadBalancer.Client(lb_protocol)
-  lb_transport.open()
+  try:
+    lb_socket = TSocket.TSocket(lb_host, lb_port)
+    lb_transport = TTransport.TBufferedTransport(lb_socket)
+    lb_protocol = TBinaryProtocol.TBinaryProtocol(lb_transport)
+    lb_client = LoadBalancer.Client(lb_protocol)
+    lb_transport.open()
   
-  node_port = 9090
-  node = lb_client.GetNode()
+    node_port = 9090
+    node = lb_client.GetNode()
 
-  node_parts = node.split(':')
-  node_host = node_parts[0]
-  if len(node_parts) > 1:
-    node_port = int(node_parts[1])
+    node_parts = node.split(':')
+    node_host = node_parts[0]
+    if len(node_parts) > 1:
+      node_port = int(node_parts[1])
 
-  lb_transport.close()
+    lb_transport.close()
+  except:
+    print 'Request to LB dropped...'
+    return
 
-  node_socket = TSocket.TSocket(node_host, node_port)
-  node_transport = TTransport.TBufferedTransport(node_socket)
-  node_protocol = TBinaryProtocol.TBinaryProtocol(node_transport)
-  node_client = Worker.Client(node_protocol)
-  node_transport.open()
+  try:
+    node_socket = TSocket.TSocket(node_host, node_port)
+    node_transport = TTransport.TBufferedTransport(node_socket)
+    node_protocol = TBinaryProtocol.TBinaryProtocol(node_transport)
+    node_client = Worker.Client(node_protocol)
+    node_transport.open()
 
-  #print 'Calling learn'
-  #start = time.time()
-  node_client.Test()
-  #end = time.time()
-  #print 'Learn took: ', end-start
-  
-  # print 'Calling predict'
-  # start = time.time()
-  # node_client.Predict(1, 'something')
-  # end = time.time()
-  # print 'Predict took: ', end-start
-  
-  node_transport.close()
+    #print 'Calling learn'
+    #start = time.time()
+    node_client.Test()
+    #end = time.time()
+    #print 'Learn took: ', end-start
+    
+    # print 'Calling predict'
+    # start = time.time()
+    # node_client.Predict(1, 'something')
+    # end = time.time()
+    # print 'Predict took: ', end-start
+    
+    node_transport.close()
+  except:
+    print 'Request to Node dropped..'
 
 
 if __name__ == '__main__':
