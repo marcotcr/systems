@@ -55,10 +55,11 @@ class WorkerHandler:
 def main():
   parser = argparse.ArgumentParser(description='TODO')
   parser.add_argument('-p', '--port', type=int, required=True, help="My port")
+  parser.add_argument('-t', '--prediction_time', type=float, required=True, help="Amount of time the prediction step should take")
   args = parser.parse_args()
 
   port = args.port
-  handler = WorkerHandler(.05, .2, 15)
+  handler = WorkerHandler(args.prediction_time, .2, 15)
   processor = Worker.Processor(handler)
   transport = TSocket.TServerSocket(port=port)
   tfactory = TTransport.TBufferedTransportFactory()
