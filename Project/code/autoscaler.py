@@ -22,7 +22,8 @@ import numpy as np
 import os
 import threading
 from scipy import stats
-
+from scipy.stats import binom
+from scipy.stats.distributions import  t
 START_TIME = 0
 
 class Node:
@@ -68,6 +69,11 @@ class Node:
         self.is_down = True
       return False
   def IsDown(self):
+    try:
+      self.transport.open()
+      self.is_down = False
+    except:
+      self.is_down = True
     return self.is_down
 
 class NaiveStrategy:
@@ -215,70 +221,77 @@ class PowerStrategy:
 
 
 class SmartStrategy:
-  def __init__(self):
-    self.state_lock = threading.Lock()
-    pass
+  def __init__(self, alpha, beta, p_failure, use_predictions=False):
+    self.use_predictions = use_predictions
+    self.alpha = alpha
+    self.beta = beta
+    self.p_failure = p_failure
   def Start(self, autoscaler):
     self.autoscaler = autoscaler
-    self.nodes_to_include = []
-    self.nodes_to_remove = []
     t = threading.Thread(target=self.CheckSLALoop)
     t.start()
     pass
-  def StartNewNode(self):
-    print 'Starting a new node'
-    #TODO: I'm assuming a node starts instantly
-    #time.sleep(30)
-    self.state_lock.acquire()
-    possible_nodes = [x for x in self.autoscaler.possible_nodes if x not in self.autoscaler.nodes]
-    if not possible_nodes:
-      print 'ERROR! Not enough available nodes'
-      quit()
-    print 'Possible nodes:', possible_nodes
-    self.nodes_to_include.append(possible_nodes[0])
-    self.state_lock.release()
-    self.autoscaler.SetStuff()
 
-  def StopNode(self):
-    print 'Stopping node'
-    if len(self.autoscaler.nodes) == 1:
-      return
-    self.state_lock.acquire()
-    self.nodes_to_remove.append(self.autoscaler.nodes[-1])
-    self.state_lock.release()
-    self.autoscaler.SetStuff()
+  def ProbSLAViolation(self, n_nodes, power, requests):
+    """Assumes that every node has power equal to the third parameter"""
+    min_nodes = np.ceil(requests / power)
+    return binom.cdf(min_nodes - 1, n_nodes, self.p_failure)
+
+  def ExpectedCost(self, n_nodes, power, requests):
+    return self.alpha * self.ProbSLAViolation(n_nodes, power, requests) + self.beta * n_nodes
 
   def CheckSLALoop(self):
-    out2 = open('/tmp/next12', 'w', 0)
     while True:
       time.sleep(60)
+      self.autoscaler.SetStuff()
+        
+  def NewState(self):
+    power = self.autoscaler.PowerRequestsPerSecond() * 60
+    power_per_node = (power / len(self.autoscaler.nodes))
+    # how many requests I got in the last minute
+    last_requests = sum(self.autoscaler.num_requests)
+    if self.use_predictions:
       x = range(1,13)
       slope, intercept, r_value, p_value, std_err = stats.linregress(x, self.autoscaler.num_requests)
-      prediction = sum([max(0, intercept + slope * x) for x in range(13,25)])
-      out2.write('Previous: %s Predicted for next 60 secs: %s r: %s p: %s stderr:%s\n' % (sum(self.autoscaler.num_requests),prediction, r_value, p_value, std_err))
+      
+      x = np.arange(1,13)
+      y = np.array(self.autoscaler.num_requests)
+      y_err = y - (intercept + slope * x)
+      p_x = np.arange(13, 25)
+      mean_x = np.mean(x) 
+      alpha = 0.05
+      n = len(x)
+      t_ = t.ppf(1 - alpha / 2, n - 2)
+      s_err = np.sum(np.power(y_err,2))
+      confs = t_ * np.sqrt((s_err/(n-2))*(1.0/n + (np.power((p_x-mean_x),2)/
+                    ((np.sum(np.power(x,2)))-n*(np.power(mean_x,2))))))
+      p_y = slope*p_x+intercept
+      lower = p_y - abs(confs)
+      upper = p_y + abs(confs)
 
-      mean_time = np.mean(self.autoscaler.prediction_times)
-      print 'CHECK mean time:', mean_time, 'SLA:', self.autoscaler.SLA
-      if mean_time > self.autoscaler.SLA:
-        self.StartNewNode()
-      if mean_time and mean_time < self.autoscaler.SLA / 2: 
-        self.StopNode()
-  def NewState(self):
-    self.state_lock.acquire()
-    nodes = [x for x in self.autoscaler.nodes if not x.IsDown()]
-    for node in self.nodes_to_include:
-      nodes.append(node)
-    if len(nodes) > 1:
-      for node in self.nodes_to_remove:
-        nodes.remove(node)
-        if len(nodes) == 1:
-          break
-    self.nodes_to_include = []
-    self.nodes_to_remove = []
-    # print 'Nodes', nodes
-    nodes = [x for x in nodes if not x.IsDown()]
+      prediction = sum([max(0, intercept + slope * x) for x in range(13,25)])
+      print 'Last requests:', last_requests
+      print 'Prediction: ', prediction, 'Upper:', sum(upper), 'Lower: ', sum(lower)
+      # I'm being conservative here, and not decreasing the number of nodes
+      # before the load goes down. I'm also using the upper bound of 95%
+      # confidence interval.
+      last_requests = max(upper, last_requests)
+      # last_requests = max(prediction, last_requests)
+
+
+
+    print 'Current power:', power, 'requests to handle:', prediction
+    min_cost = sys.maxint
+    n_nodes = 1
+    nodes = [x for x in self.autoscaler.possible_nodes if not x.IsDown()]
+    for i in range(1, len(nodes) + 1):
+      cost = self.ExpectedCost(i, power_per_node, last_requests)
+      print i, 'nodes, P(SLA): ', self.ProbSLAViolation(i, power_per_node, last_requests), 
+      print 'cost:', cost
+      if cost < min_cost:
+        min_cost, n_nodes = cost, i
+    nodes = nodes[:n_nodes]
     state = {x.name:str(x.AvgPredictionTime()) for x in nodes}
-    self.state_lock.release()
     self.autoscaler.nodes = nodes
     return state
 
@@ -420,7 +433,7 @@ def main():
   
   SLA = 1
   global START_TIME
-  strategy = PowerStrategy(True)
+  strategy = SmartStrategy(2, .5, .9, use_predictions= True)
   START_TIME = time.time()
   a = AutoScaler(client, args.load_balancer, args.nodes, SLA, strategy)
 
