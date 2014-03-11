@@ -21,6 +21,9 @@ import argparse
 import numpy as np
 import os
 import threading
+from scipy import stats
+
+START_TIME = 0
 
 class Node:
   def __init__(self, address, timeout=None):
@@ -129,6 +132,156 @@ class NaiveStrategy:
     self.autoscaler.nodes = nodes
     return state
 
+class PowerStrategy:
+  def __init__(self, use_predictions=False):
+    self.state_lock = threading.Lock()
+    self.use_predictions = use_predictions
+  def Start(self, autoscaler):
+    self.autoscaler = autoscaler
+    self.nodes_to_include = []
+    self.nodes_to_remove = []
+    t = threading.Thread(target=self.CheckSLALoop)
+    t.start()
+    pass
+  def StartNewNode(self):
+    print 'Starting a new node'
+    #TODO: I'm assuming a node starts instantly
+    #time.sleep(30)
+    self.state_lock.acquire()
+    possible_nodes = [x for x in self.autoscaler.possible_nodes if x not in self.autoscaler.nodes]
+    if not possible_nodes:
+      print 'ERROR! Not enough available nodes'
+      quit()
+    print 'Possible nodes:', possible_nodes
+    self.nodes_to_include.append(possible_nodes[0])
+    self.state_lock.release()
+    self.autoscaler.SetStuff()
+
+  def StopNode(self):
+    print 'Stopping node'
+    if len(self.autoscaler.nodes) == 1:
+      return
+    self.state_lock.acquire()
+    self.nodes_to_remove.append(self.autoscaler.nodes[-1])
+    self.state_lock.release()
+    self.autoscaler.SetStuff()
+
+  def CheckSLALoop(self):
+    while True:
+      time.sleep(60)
+      # how many requests I can handle every minute
+      power = self.autoscaler.PowerRequestsPerSecond() * 60
+      # how many requests I got in the last minute
+      last_requests = sum(self.autoscaler.num_requests)
+      if self.use_predictions:
+        x = range(1,13)
+        slope, intercept, r_value, p_value, std_err = stats.linregress(x, self.autoscaler.num_requests)
+        prediction = sum([max(0, intercept + slope * x) for x in range(13,25)])
+        last_requests = prediction
+      print 'CHECK power:', power, 'prediction', prediction
+      added_nodes = False
+      while last_requests > power :
+        self.StartNewNode()
+        power = self.autoscaler.PowerRequestsPerSecond() * 60
+        print 'new power:', power, 'last_requests', last_requests
+        added_nodes = True
+      if not added_nodes:
+        power_last = ((1 / self.autoscaler.nodes[-1].AvgPredictionTime()) * 10) * 60
+        print 'Last requests:', last_requests, 'Power without one node:', power - power_last
+        while last_requests < power - power_last and len(self.autoscaler.nodes) > 1:
+          self.StopNode()
+          power = power - power_last
+          power_last = (1 / self.autoscaler.nodes[-1].AvgPredictionTime()) * 10
+        
+  def NewState(self):
+    self.state_lock.acquire()
+    nodes = [x for x in self.autoscaler.nodes if not x.IsDown()]
+    for node in self.nodes_to_include:
+      nodes.append(node)
+    if len(nodes) > 1:
+      for node in self.nodes_to_remove:
+        nodes.remove(node)
+        if len(nodes) == 1:
+          break
+    self.nodes_to_include = []
+    self.nodes_to_remove = []
+    # print 'Nodes', nodes
+    nodes = [x for x in nodes if not x.IsDown()]
+    state = {x.name:str(x.AvgPredictionTime()) for x in nodes}
+    self.state_lock.release()
+    self.autoscaler.nodes = nodes
+    return state
+
+
+
+class SmartStrategy:
+  def __init__(self):
+    self.state_lock = threading.Lock()
+    pass
+  def Start(self, autoscaler):
+    self.autoscaler = autoscaler
+    self.nodes_to_include = []
+    self.nodes_to_remove = []
+    t = threading.Thread(target=self.CheckSLALoop)
+    t.start()
+    pass
+  def StartNewNode(self):
+    print 'Starting a new node'
+    #TODO: I'm assuming a node starts instantly
+    #time.sleep(30)
+    self.state_lock.acquire()
+    possible_nodes = [x for x in self.autoscaler.possible_nodes if x not in self.autoscaler.nodes]
+    if not possible_nodes:
+      print 'ERROR! Not enough available nodes'
+      quit()
+    print 'Possible nodes:', possible_nodes
+    self.nodes_to_include.append(possible_nodes[0])
+    self.state_lock.release()
+    self.autoscaler.SetStuff()
+
+  def StopNode(self):
+    print 'Stopping node'
+    if len(self.autoscaler.nodes) == 1:
+      return
+    self.state_lock.acquire()
+    self.nodes_to_remove.append(self.autoscaler.nodes[-1])
+    self.state_lock.release()
+    self.autoscaler.SetStuff()
+
+  def CheckSLALoop(self):
+    out2 = open('/tmp/next12', 'w', 0)
+    while True:
+      time.sleep(60)
+      x = range(1,13)
+      slope, intercept, r_value, p_value, std_err = stats.linregress(x, self.autoscaler.num_requests)
+      prediction = sum([max(0, intercept + slope * x) for x in range(13,25)])
+      out2.write('Previous: %s Predicted for next 60 secs: %s r: %s p: %s stderr:%s\n' % (sum(self.autoscaler.num_requests),prediction, r_value, p_value, std_err))
+
+      mean_time = np.mean(self.autoscaler.prediction_times)
+      print 'CHECK mean time:', mean_time, 'SLA:', self.autoscaler.SLA
+      if mean_time > self.autoscaler.SLA:
+        self.StartNewNode()
+      if mean_time and mean_time < self.autoscaler.SLA / 2: 
+        self.StopNode()
+  def NewState(self):
+    self.state_lock.acquire()
+    nodes = [x for x in self.autoscaler.nodes if not x.IsDown()]
+    for node in self.nodes_to_include:
+      nodes.append(node)
+    if len(nodes) > 1:
+      for node in self.nodes_to_remove:
+        nodes.remove(node)
+        if len(nodes) == 1:
+          break
+    self.nodes_to_include = []
+    self.nodes_to_remove = []
+    # print 'Nodes', nodes
+    nodes = [x for x in nodes if not x.IsDown()]
+    state = {x.name:str(x.AvgPredictionTime()) for x in nodes}
+    self.state_lock.release()
+    self.autoscaler.nodes = nodes
+    return state
+
 class AutoScaler:
   def __init__(self, load_balancer_client, load_balancer_address, possible_nodes, SLA, strategy):
     self.possible_nodes = [Node(x) for x in possible_nodes]
@@ -160,7 +313,7 @@ class AutoScaler:
 
     self.start_time = time.time()
     self.nodes_log = open('/tmp/nodes', 'w', 0)
-    self.num_requests = [0] * 15
+    self.num_requests = [0] * 12
     self.previous_num_requests = 0
     self.SLA = SLA
     self.strategy = strategy
@@ -175,6 +328,14 @@ class AutoScaler:
     t4 = threading.Thread(target=self.NumRequestsLoop)
     t4.start()
 
+  def PowerRequestsPerSecond(self):
+    """Return how many requests I could handle per second if none of my nodes
+    fail"""
+    power = 0
+    for node in self.nodes:
+      power += (1 / node.AvgPredictionTime()) * 10 # assuming 10 worker threads
+    return power
+
   def AvgPredictionLoop(self):
     while True:
       for node in self.nodes:
@@ -183,6 +344,7 @@ class AutoScaler:
       time.sleep(30)
   def PredictionTimeLoop(self):
     file_ = open('/tmp/pred_time', 'w', 0)
+    global START_TIME
     while True:
       start = time.time()
       self.transport.open()
@@ -208,28 +370,36 @@ class AutoScaler:
         except:
           print 'Timeout!'
           self.prediction_times[self.p_cycle.next()] = 10
-      file_.write('%s %s %s\n' % (time.time() - self.start_time, np.mean(self.prediction_times), ','.join(map(str, self.prediction_times))))
+      file_.write('%s %s %s\n' % (time.time() - START_TIME, np.mean(self.prediction_times), ','.join(map(str, self.prediction_times))))
       time.sleep(5)
   def SetStuff(self):
+    global START_TIME
     # self.load_balancer.SetNodes({'localhost:6666': '1', 'localhost:5555':'5'})
     state = self.strategy.NewState()
     print 'New state:', state
-    self.nodes_log.write('%s %s\n' % (time.time() - self.start_time, len(state)))
+    self.nodes_log.write('%s %s\n' % (time.time() - START_TIME, len(state)))
     self.load_balancer.SetNodes(state)
   def LoadBalancerLoop(self):
     while True:
       self.SetStuff()
       time.sleep(60)
   def NumRequestsLoop(self):
+    global START_TIME
     out = open('/tmp/requests', 'w', 0)
-    start_time = time.time()
+    out2 = open('/tmp/regression', 'w', 0)
     while(True):
       num_requests = self.load_balancer.NumRequests()
       temp = num_requests - self.previous_num_requests
+      x = range(1,13)
+      slope, intercept, r_value, p_value, std_err = stats.linregress(x, self.num_requests)
+      print self.num_requests, slope, intercept
+
       self.previous_num_requests = num_requests
       self.num_requests.append(temp)
       self.num_requests.pop(0)
-      out.write('%s %s\n' % (time.time() - start_time, self.previous_num_requests))
+      out.write('%s %s\n' % (time.time() - START_TIME, self.previous_num_requests))
+      out2.write('True: %s Predicted: %s r: %s p: %s stderr:%s\n' % (temp, intercept + slope * 11, r_value, p_value, std_err))
+
       # print 'Requests:', self.num_requests
       time.sleep(5)
 
@@ -249,7 +419,9 @@ def main():
   transport.open()
   
   SLA = 1
-  strategy = NaiveStrategy()
+  global START_TIME
+  strategy = PowerStrategy(True)
+  START_TIME = time.time()
   a = AutoScaler(client, args.load_balancer, args.nodes, SLA, strategy)
 
   print "done!"

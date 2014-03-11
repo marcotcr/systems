@@ -58,7 +58,7 @@ def main():
   args = parser.parse_args()
 
   port = args.port
-  handler = WorkerHandler(.05, .2, 15)
+  handler = WorkerHandler(.1, .2, 15)
   processor = Worker.Processor(handler)
   transport = TSocket.TServerSocket(port=port)
   tfactory = TTransport.TBufferedTransportFactory()
