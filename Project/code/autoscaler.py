@@ -183,7 +183,7 @@ class PowerStrategy:
         x = range(1,13)
         slope, intercept, r_value, p_value, std_err = stats.linregress(x, self.autoscaler.num_requests)
         prediction = sum([max(0, intercept + slope * x) for x in range(13,25)])
-        last_requests = prediction
+        last_requests = max(prediction, last_requests)
       print 'CHECK power:', power, 'prediction', prediction
       added_nodes = False
       while last_requests > power :
@@ -226,6 +226,7 @@ class SmartStrategy:
     self.alpha = alpha
     self.beta = beta
     self.p_failure = p_failure
+    self.out = open('/tmp/forecasts', 'w', 0)
   def Start(self, autoscaler):
     self.autoscaler = autoscaler
     t = threading.Thread(target=self.CheckSLALoop)
@@ -235,7 +236,7 @@ class SmartStrategy:
   def ProbSLAViolation(self, n_nodes, power, requests):
     """Assumes that every node has power equal to the third parameter"""
     min_nodes = np.ceil(requests / power)
-    return binom.cdf(min_nodes - 1, n_nodes, self.p_failure)
+    return binom.cdf(min_nodes - 1, n_nodes, (1 - self.p_failure))
 
   def ExpectedCost(self, n_nodes, power, requests):
     return self.alpha * self.ProbSLAViolation(n_nodes, power, requests) + self.beta * n_nodes
@@ -246,6 +247,7 @@ class SmartStrategy:
       self.autoscaler.SetStuff()
         
   def NewState(self):
+    global START_TIME
     power = self.autoscaler.PowerRequestsPerSecond() * 60
     power_per_node = (power / len(self.autoscaler.nodes))
     # how many requests I got in the last minute
@@ -271,11 +273,12 @@ class SmartStrategy:
 
       prediction = sum([max(0, intercept + slope * x) for x in range(13,25)])
       print 'Last requests:', last_requests
+      self.out.write('%s Last requests: %s prediction: %s upper: %s' % (time.time() - START_TIME, last_requests, prediction, upper))
       print 'Prediction: ', prediction, 'Upper:', sum(upper), 'Lower: ', sum(lower)
       # I'm being conservative here, and not decreasing the number of nodes
       # before the load goes down. I'm also using the upper bound of 95%
       # confidence interval.
-      last_requests = max(upper, last_requests)
+      last_requests = max(sum(upper), last_requests)
       # last_requests = max(prediction, last_requests)
 
 
@@ -293,7 +296,7 @@ class SmartStrategy:
     nodes = nodes[:n_nodes]
     state = {x.name:str(x.AvgPredictionTime()) for x in nodes}
     self.autoscaler.nodes = nodes
-    self.state_lock.release()
+    sys.stdout.flush()
     return state
 
 class AutoScaler:
@@ -413,6 +416,7 @@ class AutoScaler:
       self.num_requests.pop(0)
       out.write('%s %s\n' % (time.time() - START_TIME, self.previous_num_requests))
       out2.write('True: %s Predicted: %s r: %s p: %s stderr:%s\n' % (temp, intercept + slope * 11, r_value, p_value, std_err))
+      sys.stdout.flush()
 
       # print 'Requests:', self.num_requests
       time.sleep(5)
@@ -422,8 +426,16 @@ def main():
   parser = argparse.ArgumentParser(description='TODO')
   parser.add_argument('-l', '--load_balancer', required=True, help="load balancer ip:port")
   parser.add_argument('-n', '--nodes', nargs='+', required=True,  help="list of nodes in the format ip:port")
+  parser.add_argument('-a', '--alpha',type=float, required=False, help="Alpha")
+  parser.add_argument('-b', '--beta', type=float, required=False, help="beta")
+  parser.add_argument('-p', '--p_fail', type=float, required=False, help="probability of node failing")
+  parser.add_argument('-s', '--strategy', required=True, help="n for naive, p for power, s for smart")
+  parser.add_argument('-u', '--use_predictions', required=False, type=bool, default=True, help="Using predictions. Default=false")
   args = parser.parse_args()
 
+  if args.strategy == 's' and (not args.alpha or not args.beta or not args.p_fail):
+    print 'Alpha, beta and p_fail required for smart strategy' 
+    quit()
 
   host, port = args.load_balancer.split(':')
   socket = TSocket.TSocket(host, int(port))
@@ -434,7 +446,12 @@ def main():
   
   SLA = 1
   global START_TIME
-  strategy = SmartStrategy(2, .5, .9, use_predictions= True)
+  if args.strategy == 's':
+    strategy = SmartStrategy(args.alpha, args.beta, args.p_fail, use_predictions= args.use_predictions)
+  if args.strategy == 'p':
+    strategy = PowerStrategy(args.use_predictions)
+  if args.strategy == 'n':
+    strategy = NaiveStrategy()
   START_TIME = time.time()
   a = AutoScaler(client, args.load_balancer, args.nodes, SLA, strategy)
 
