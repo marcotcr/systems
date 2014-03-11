@@ -128,8 +128,8 @@ class NaiveStrategy:
     # print 'Nodes', nodes
     nodes = [x for x in nodes if not x.IsDown()]
     state = {x.name:str(x.AvgPredictionTime()) for x in nodes}
-    self.state_lock.release()
     self.autoscaler.nodes = nodes
+    self.state_lock.release()
     return state
 
 class PowerStrategy:
@@ -208,8 +208,8 @@ class PowerStrategy:
     # print 'Nodes', nodes
     nodes = [x for x in nodes if not x.IsDown()]
     state = {x.name:str(x.AvgPredictionTime()) for x in nodes}
-    self.state_lock.release()
     self.autoscaler.nodes = nodes
+    self.state_lock.release()
     return state
 
 
@@ -278,8 +278,8 @@ class SmartStrategy:
     # print 'Nodes', nodes
     nodes = [x for x in nodes if not x.IsDown()]
     state = {x.name:str(x.AvgPredictionTime()) for x in nodes}
-    self.state_lock.release()
     self.autoscaler.nodes = nodes
+    self.state_lock.release()
     return state
 
 class AutoScaler:
