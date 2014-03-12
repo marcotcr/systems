@@ -65,6 +65,7 @@ def request(lb_host, lb_port):
 if __name__ == '__main__':
   parser = argparse.ArgumentParser(description='TODO')
   parser.add_argument('-l', '--loadbalancer', required=True, help="Load LoadBalancer host in the format host::port")
+  parser.add_argument('-p', '--load_pattern', required=True, type= int, help="1 for bell, 2 for step.")
   args = parser.parse_args()
   
   lb_port = 9090
@@ -74,15 +75,23 @@ if __name__ == '__main__':
   if len(parts) > 1:
     lb_port = int(parts[1])
 
-  num_requests = [50]*10
-  sigma = 340
-  mu = 40
-  bins = np.linspace(-420, 500, 200) 
-  num_ranges = (1/(sigma * np.sqrt(2 * np.pi)) * np.exp( - (bins - mu)**2 / (2 * sigma**2)))*125000
-  num_requests.extend(num_ranges)
-  num_requests.extend([50]*10)
-  #num_requests.extend(num_requests[:])
-  #num_requests.extend(num_requests[:])
+  if args.load_pattern == 1:
+    num_requests = [50]*10
+    sigma = 340
+    mu = 40
+    bins = np.linspace(-420, 500, 520) 
+    num_ranges = (1/(sigma * np.sqrt(2 * np.pi)) * np.exp( - (bins - mu)**2 / (2 * sigma**2)))*125000
+    num_requests.extend(num_ranges)
+    num_requests.extend([50]*10)
+    #num_requests.extend(num_requests[:])
+    #num_requests.extend(num_requests[:])
+  else:
+    num_requests = [50]*20
+    num_requests.extend([160]*40)
+    num_requests.extend([50]*20)
+    num_requests.extend(num_requests[:])
+    num_requests.extend(num_requests[:])
+
   for times in num_requests:
     print int(times)
     start = time.time()
