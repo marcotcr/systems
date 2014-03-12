@@ -10,7 +10,8 @@ parser.add_argument('-s', '--strategy', required=True, help="n for naive, p for 
 parser.add_argument('-p', '--p_fail', type=float, required=False, help="probability of node failing")
 parser.add_argument('-u', '--use_predictions', required=False, type=bool, default=True, help="Using predictions. Default=false")
 parser.add_argument('-n', '--num_nodes', required=True, type=int, default=True, help="number of nodes")
-parser.add_argument('-l', '--load_pattern', required=True, type=int, default=True, help="1 for bell, 2 for step")
+parser.add_argument('-l', '--load_pattern', required=True, type=int, default=True, help="1 for bell, 2 for step, 3 for double bell.")
+parser.add_argument('-D', '--duration', required=True, type=int, default=True, help="Experiment Duration in seconds.")
 args = parser.parse_args()
 if args.strategy == 's' and (not args.alpha or not args.beta):
   print 'Alpha and beta required for smart strategy' 
@@ -40,7 +41,7 @@ cmd = 'python client.py -l localhost:7777 -p %d >/tmp/clientz &' % (args.load_pa
 print cmd
 os.system(cmd)
 
-time.sleep(550)
+time.sleep(args.duration)
 cmd = './kill-all'
 print cmd
 os.system(cmd)
