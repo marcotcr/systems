@@ -1,19 +1,36 @@
 import numpy as np
 import matplotlib.pyplot as plt
 import sys
+import argparse
 
 def doMain():
-	nodes = np.genfromtxt(sys.argv[1], delimiter = ' ')
-	pred_time = np.genfromtxt(sys.argv[2], delimiter = ' ')
-	requests = np.genfromtxt(sys.argv[3], delimiter = ' ')
+	parser = argparse.ArgumentParser(description='TODO')
+	parser.add_argument('-n', '--nodes_log', required=True, help="path to nodes log file")
+	parser.add_argument('-t', '--pred_times_log', required=True, help="path to pred_time log file")
+	parser.add_argument('-r', '--requests_log', required=True, help="path to requests log file")
+	parser.add_argument('-p', '--load_pattern', required=True, type= int, help="1 for bell, 2 for step.")
+	args = parser.parse_args()
 
-	num_requests = [50]*10
-	sigma = 340
-	mu = 40
-	bins = np.linspace(-420, 500, 200) 
-	num_ranges = (1/(sigma * np.sqrt(2 * np.pi)) * np.exp( - (bins - mu)**2 / (2 * sigma**2)))*125000
-	num_requests.extend(num_ranges)
-	num_requests.extend([50]*10)
+	nodes = np.genfromtxt(args.nodes_log, delimiter=' ') 
+	pred_time = np.genfromtxt(args.pred_times_log, delimiter=' ')  
+	requests = np.genfromtxt(args.requests_log, delimiter=' ') 
+
+	if args.load_pattern == 1:
+		num_requests = [50]*10
+		sigma = 340
+		mu = 40
+		bins = np.linspace(-420, 500, 520) 
+		num_ranges = (1/(sigma * np.sqrt(2 * np.pi)) * np.exp( - (bins - mu)**2 / (2 * sigma**2)))*125000
+		num_requests.extend(num_ranges)
+		num_requests.extend([50]*10)
+		#num_requests.extend(num_requests[:])
+		#num_requests.extend(num_requests[:])
+	else:
+		num_requests = [50]*20
+		num_requests.extend([160]*40)
+		num_requests.extend([50]*20)
+		num_requests.extend(num_requests[:])
+		num_requests.extend(num_requests[:])
 
 	for i in range(len(requests)-1, 0, -1):
 		requests[i][1] = requests[i][1] - requests[i-1][1]
@@ -27,8 +44,12 @@ def doMain():
 	for i in range(len(nodes)-1):
 		n_nodes.append(nodes[i])
 		n_nodes.append(np.array([nodes[i+1][0], nodes[i][1]]))
+	n_nodes.append(nodes[-1])
 	n_nodes = np.array(n_nodes)
-	#print n_nodes, p_times, requests
+	
+	print n_nodes
+	print p_times
+	print requests
 	
 	## Active requests
 	fig, ax1 = plt.subplots()
