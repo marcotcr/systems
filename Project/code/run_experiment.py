@@ -12,6 +12,7 @@ parser.add_argument('-u', '--use_predictions', required=False, type=bool, defaul
 parser.add_argument('-n', '--num_nodes', required=True, type=int, default=True, help="number of nodes")
 parser.add_argument('-l', '--load_pattern', required=True, type=int, default=True, help="1 for bell, 2 for step, 3 for double bell.")
 parser.add_argument('-D', '--duration', required=True, type=int, default=True, help="Experiment Duration in seconds.")
+parser.add_argument('-k','--kill_node', required=False, type=bool, default=False, help="Set to True if you want to kill a node in the middle")
 args = parser.parse_args()
 if args.strategy == 's' and (not args.alpha or not args.beta):
   print 'Alpha and beta required for smart strategy' 
@@ -41,7 +42,18 @@ cmd = 'python client.py -l localhost:7777 -p %d >/tmp/clientz &' % (args.load_pa
 print cmd
 os.system(cmd)
 
-time.sleep(args.duration)
-cmd = './kill-all'
-print cmd
-os.system(cmd)
+if args.kill_node:
+	time.sleep(70)
+	cmd = 'ps aux| grep worker-server| grep Cellar | awk \'{print $2}\' | tail -1 | xargs kill -9'
+	print cmd
+	os.system(cmd)
+
+	time.sleep(args.duration-70)
+	cmd = './kill-all'
+	print cmd
+	os.system(cmd)
+else:
+	time.sleep(args.duration)
+	cmd = './kill-all'
+	print cmd
+	os.system(cmd)

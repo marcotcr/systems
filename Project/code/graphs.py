@@ -18,6 +18,7 @@ def doMain():
 	alpha = args.nodes_log.split('/')[-2].split('.')[-2]
 	beta = args.nodes_log.split('/')[-2].split('.')[-1]
 	name = args.nodes_log.split('/')[-2]
+
 	if args.load_pattern == 1:
 		num_requests = [50]*10
 		sigma = 340
@@ -138,6 +139,46 @@ def doMain():
 	ax2.set_ylim(-1,2)
 	plt.savefig(name + '_SLA_Violations.png')
 
-	
+	if 'smart' in name.lower():
+		forecasts_file = args.nodes_log.replace('nodes', 'forecasts')
+		f = open(forecasts_file, 'r')
+		actual_load = []
+		predicted_load = []
+		times = []
+		upper_load = []
+		for line in f:
+			words = line.replace('\n', '').split(' ')
+			times.append(float(words[0]))
+			actual_load.append(float(words[3]))
+			predicted_load.append(float(words[5]))
+			upper_load.append(float(words[7]))
+
+		#print times, actual_load, predicted_load, upper_load
+		previous = [0,]
+		previous.extend(actual_load[0:-1])
+		#print len(previous), len(upper_load)
+		max_prev_upper = []
+		for i in range(len(previous)):
+			max_prev_upper.append(max(previous[i], upper_load[i]))
+		
+		fig, ax1 = plt.subplots()
+		al = ax1.plot(np.array(times), np.array(actual_load), 'b-')
+		pl = ax1.plot(np.array(times), np.array(predicted_load), 'g-')
+		upl = ax1.plot(np.array(times), np.array(max_prev_upper), 'y-')
+
+		ax1.legend((al[0],pl[0],upl[0]), ('Actual Load','Predicted Load', 'Max(Upper, Previous load)'), loc='best')
+		ax1.set_xlabel('time (s)')
+		for t in times:
+			ax1.plot([t,t],[0,max(num_requests) + 10] , 'y--')
+		# Make the y-axis label and tick labels match the line color.
+		
+
+		ax1.set_ylabel('requests/min', color='b')
+		for tl in ax1.get_yticklabels():
+			tl.set_color('b')
+		
+		ax1.set_ylim(bottom = 0)
+		plt.savefig(name + '_predictedVsActual.png')
+
 if __name__ == '__main__':
 	doMain()

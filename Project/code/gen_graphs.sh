@@ -27,3 +27,11 @@ python graphs.py -n ../Logs/Smart3.8.8/nodes -t ../Logs/Smart3.8.8/pred_time -r 
 
 python graphs.py -n ../Logs/Smart2.97.2/nodes -t ../Logs/Smart2.97.2/pred_time -r ../Logs/Smart2.97.2/requests -p 2
 python graphs.py -n ../Logs/Smart1.97.2/nodes -t ../Logs/Smart1.97.2/pred_time -r ../Logs/Smart1.97.2/requests -p 1
+
+python graphs.py -n ../Logs/Smart2.97.8/nodes -t ../Logs/Smart2.97.8/pred_time -r ../Logs/Smart2.97.8/requests -p 2
+python graphs.py -n ../Logs/Smart1.97.8/nodes -t ../Logs/Smart1.97.8/pred_time -r ../Logs/Smart1.97.8/requests -p 1
+
+python graphs.py -n ../Logs/SmartKill1.8.2/nodes -t ../Logs/SmartKill1.8.2/pred_time -r ../Logs/SmartKill1.8.2/requests -p 1
+python graphs.py -n ../Logs/SmartKill1.97.2/nodes -t ../Logs/SmartKill1.97.2/pred_time -r ../Logs/SmartKill1.97.2/requests -p 1
+python graphs.py -n ../Logs/NaiveKill1.8.2/nodes -t ../Logs/NaiveKill1.8.2/pred_time -r ../Logs/NaiveKill1.8.2/requests -p 1
+python graphs.py -n ../Logs/PowerKill1.8.2/nodes -t ../Logs/PowerKill1.8.2/pred_time -r ../Logs/PowerKill1.8.2/requests -p 1
