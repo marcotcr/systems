@@ -273,7 +273,7 @@ class SmartStrategy:
 
       prediction = sum([max(0, intercept + slope * x) for x in range(13,25)])
       print 'Last requests:', last_requests
-      self.out.write('%s Last requests: %s prediction: %s upper: %s' % (time.time() - START_TIME, last_requests, prediction, upper))
+      self.out.write('%s Last requests: %s prediction: %s upper: %s\n' % (time.time() - START_TIME, last_requests, prediction, sum(upper)))
       print 'Prediction: ', prediction, 'Upper:', sum(upper), 'Lower: ', sum(lower)
       # I'm being conservative here, and not decreasing the number of nodes
       # before the load goes down. I'm also using the upper bound of 95%
