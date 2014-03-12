@@ -36,7 +36,7 @@ cmd += ' > /tmp/autoscaler &'
 print cmd
 os.system(cmd)
 time.sleep(60)
-cmd = 'python client.py -l localhost:7777 -p 1 >/tmp/clientz &'
+cmd = 'python client.py -l localhost:7777 -p %d >/tmp/clientz &' % (args.load_pattern)
 print cmd
 os.system(cmd)
 
