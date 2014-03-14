@@ -113,6 +113,100 @@ very straightforward, and can be used with commodity machines for handling a lot
 of requests, while still being resilient to failures (depending of course on the
 Autoscaler policy).
 
+\section{Auto Scaling}
+\subsection{Objective}
+The problem of auto scaling online learning can be formulated as minimizing a
+cost function over a sequence of time intervals. This function for each time
+interval is presented in
+Equation 1. 
+\begin{equation}
+cost = \alpha SLA + \beta P + \gamma LR + \delta L
+\end{equation}
+\textbf{SLA} is an indicator variable that is positive when a Service License
+Agreement (SLA) is violated in the time interval in question. This SLA is
+related to predictions, and can be defined as a threshold on the average time
+per prediction, on the maximum time per prediction, etc. There is a cost
+$\alpha$ associated with the SLA violation, that depends on the specific
+application that depends on the system. A bad user experience due to slow
+page loading on a search engine can be fatal to the success of the business,
+while a slower prediction for some internal testing service can be less costly.
+\textbf{P} denotes the number of predictors active in the time interval, while
+$\beta$ is a measure of the cost of each predictor. \textbf{LR} is a measure of
+the learning rate achieved by the machine learning algorithm. Some of the most
+popular online learning algorithms, such as Stochastic Gradient Descent, have a
+property that error $\epsilon$ decreases
+linearly with the number of training examples
+\cite{Nemirovski:2009:RSA:1654243.1654247}: that is, the relation is $O(1 /
+\epsilon)$ , meaning that if training examples
+are available, adding more learners would offset the training error, and thus
+increase whatever measure of Learning Rate is being used - although probably not with
+linear speedup \cite{pserver1, pserver2}.  $\textbf{L}$ denotes
+the number of learners active in the time interval.
+
+This objective formulation decouples learning from predicting, which brings
+advantages and disadvantages. Usually, the processor / memory requirements for
+learning and predicting are different - one would want a more powerful machine
+for learning than for predicting. Decoupling also ensures that failures in
+learners do not affect predictors, and vice versa. However, having learners and
+predictors together could be interesting in that learning involves predicting,
+and thus separating them creates the need to do predictions twice for the same
+examples: once in the predictor and once in the learner. In this project, we
+abstracted out the learning part, and focused on minimizing the first two terms
+in Equation 1. This choice was made assuming that a fixed, small number of
+learners would be sufficient for many applications, and that this number would
+not need to be changed very often - in contrast to predictors, who would need to
+be changed according to load.
+
+\subsection{Load Prediction}
+Ideally, we would employ a machine learning algorithm in order to predict the
+load in each future time interval. Features that we would consider include:
+\begin{enumerate}
+\item Time of day: traffic in most applications have load patterns that are very
+time-specific. Most people are sleeping at night, have a lunch break around the
+middle of the day, etc.
+\item Trends in other services by the same company: if Facebook sees an increase
+in the number of users in the website at a particular time, it is more likely
+that internal services that use machine learning will also see an increase.
+\item Usual load pattern: certain applications have very predictable load
+patterns. An internal service that always gets called in exponentially growing
+bursts would be an example.
+\item Trend in the last time interval(s): by measuring the load at smaller
+intervals in the last time interval, one can build a ``load trend'' for the next
+time interval.
+\end{enumerate}
+Since we used simulated data (we do not have access to such a rich dataset), we
+employed the trend in the last time interval in order to predict future load, by
+using traditional linear regression. In order to ensure a smoother decay (and
+thus prevent SLA violations due to wrong predictions), we took the max between the upper limit
+on a 95\% confidence interval on the linear regression and the number of
+requests in the previous time interval as a prediction. Figure \ref{loadsss}
+illustrates the behaviour of our predictions on simulated data. We assume that
+we must predict the load at every minute, and collect the current load at every
+5 seconds in order to build the trend line. The blue lines are the actual load,
+while the green and yellow lines indicate the linear regression prediction and
+the max we cited before, respectively. It is clear that the yellow line is more
+``conservative'', and always stays on top of the actual load. This is what we
+used for predicting loads in our experiments.
+
+\begin{figure}[h!]
+\centering
+\begin{subfigure}{.6\textwidth}
+\includegraphics[width=\textwidth]{Smart182predictedVsActual.png}
+\caption{Load Pattern 1}
+\end{subfigure}
+\begin{subfigure}{.6\textwidth}
+\includegraphics[width=\textwidth]{Smart282predictedVsActual.png}
+\caption{Load Pattern 2}
+\end{subfigure}
+\begin{subfigure}{.6\textwidth}
+\includegraphics[width=\textwidth]{Smart382predictedVsActual.png}
+\caption{Load Pattern 3}
+\end{subfigure}
+\caption{Predicted vs Actual load, different load patterns.}
+\label{loadsss}
+\end{figure}
+
+\subsection{Strategies}
 \bibliographystyle{plain}
 \bibliography{references}
 
