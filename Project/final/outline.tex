@@ -293,7 +293,177 @@ uniform. This is a reasonable assumption on most cases. The smart strategy,
 therefore, amounts to picking $P$ such that the expected cost function presented
 in Equation 2 is minimized.
 
+\section{Experiments}
+For our experiments, we simulated the architecture on Figure 1 on a single
+machine, by having multiple servers on different ports, and multiple clients
+with different threads. We made the time per prediction be constant, by having
+it be a sleep with $t = 0.1$ seconds (so we are not making real predictions,
+just simulating them). Finally, we set the time interval on which the autoscaler
+works to be one minute - so that the state of the system can potentially change
+every minute. The Autoscaler sends heartbeats to the Load Balancer, and finds
+out how many requests have been served every 5 seconds, in order to build a
+trend for load prediction. The Autoscaler sends heartbeats to the predictors
+every 30 seconds, in order to check (1), that they are still up, and (2), that
+their power remains the same (if not, it includes the change in the next state
+for smart load balancing).
 
+Figures 3, 4 and 5 present the behaviour of the different load balancing
+strategies when faced with the loads previously introduced in Figure
+\ref{loadsss}. The loads are now depicted with a granularity of 1 second, as
+opposed to 1 minute in Figure 2. The blue lines indicate the number of requests,
+and the green line indicates either the number of active nodes or whether or not
+an SLA violation ocurred. The vertical dotted lines indicate the change points -
+that is, the moments when the autoscaler changes (or not) the system's
+configuration, which happens every 60 seconds.
+
+In Figures 3(a) and 3(b), we see the behaviour of the Naive strategy. As soon as
+SLA violations start to occur, it adds a new node into the system. However, once
+the new node is added, the average prediction time goes down dramatically, and
+the strategy proceeds to remove a node - which causes a lot of SLA violations,
+and thus subsequent additions of nodes. The Power Strategy (Figures 3(c) and
+3(d)) does better, as it takes into account the power of the nodes. It is able
+to react to the increase in load, although it still suffers two SLA violations
+in the beginning. The Smart strategy with high SLA cost $\alpha$ presented in
+Figures 3(e) and 3(f) anticipates the
+rise in load, and adds enough nodes to handle it before it happens, suffering no
+SLA violations. In Figures 3(g) and 3(h), we set the cost of each node to be the
+same as the cost of an SLA violation. When this happens, the system has no
+incentive to add new nodes, and thus suffers SLA violations throughout the
+experiment. This shows how the smart strategy adapts to the costs $\alpha$ and
+$\beta$ accordingly.
+
+Figure 4 presentes a pathological case, where the load goes up and down abruptly
+right before or right after the change points. The Naive strategy is once again
+reactive. The Power strategy suffers the most from this, as it takes nodes up
+and down abruptly, and thus suffers the most SLA violations. The Smart strategy
+with high $\alpha$ is more conservative throughout, and suffers the least number
+of SLA violations.
+
+Finally, Figure 5 presents a load pattern similar to the one in Figure 3, but
+duplicated. All strategies do the same as they did in the first load pattern.
+However, this figure shows how effective auto-scaling can be at managing the
+cost of having multiple nodes: the Smart strategy is able to suffer no SLA
+violations, while only using two nodes when the load demands it, and staying
+with one node when it doesn't.
+
+\begin{figure}[h!]
+\begin{subfigure}{.5\textwidth}
+\includegraphics[width=\textwidth]{Naive182nodes.png}
+\caption{Naive Strategy - active nodes}
+\end{subfigure}
+\begin{subfigure}{.5\textwidth}
+\includegraphics[width=\textwidth]{Naive182SLA.png}
+\caption{Naive Strategy - SLA violations}
+\end{subfigure}
+
+\begin{subfigure}{.5\textwidth}
+\includegraphics[width=\textwidth]{Power182nodes.png}
+\caption{Power Strategy - active nodes}
+\end{subfigure}
+\begin{subfigure}{.5\textwidth}
+\includegraphics[width=\textwidth]{Power182SLA.png}
+\caption{Power Strategy - SLA violations}
+\end{subfigure}
+
+\begin{subfigure}{.5\textwidth}
+\includegraphics[width=\textwidth]{Smart182nodes.png}
+\caption{Smart Strategy - active nodes}
+\end{subfigure}
+\begin{subfigure}{.5\textwidth}
+\includegraphics[width=\textwidth]{Smart182SLA.png}
+\caption{Smart Strategy - SLA violations}
+\end{subfigure}
+
+\begin{subfigure}{.5\textwidth}
+\includegraphics[width=\textwidth]{Smart188nodes.png}
+\caption{Smart Strategy with high node cost - active nodes}
+\end{subfigure}
+\begin{subfigure}{.5\textwidth}
+\includegraphics[width=\textwidth]{Smart188SLA.png}
+\caption{Smart Strategy with high node cost - SLA violations}
+\end{subfigure}
+
+\label{load1}
+\caption{Load Pattern 1}
+\end{figure}
+
+\begin{figure}[h!]
+\begin{subfigure}{.5\textwidth}
+\includegraphics[width=\textwidth]{Naive282nodes.png}
+\caption{Naive Strategy - active nodes}
+\end{subfigure}
+\begin{subfigure}{.5\textwidth}
+\includegraphics[width=\textwidth]{Naive282SLA.png}
+\caption{Naive Strategy - SLA violations}
+\end{subfigure}
+
+\begin{subfigure}{.5\textwidth}
+\includegraphics[width=\textwidth]{Power282nodes.png}
+\caption{Power Strategy - active nodes}
+\end{subfigure}
+\begin{subfigure}{.5\textwidth}
+\includegraphics[width=\textwidth]{Power282SLA.png}
+\caption{Power Strategy - SLA violations}
+\end{subfigure}
+
+\begin{subfigure}{.5\textwidth}
+\includegraphics[width=\textwidth]{Smart222nodes.png}
+\caption{Smart Strategy - active nodes}
+\end{subfigure}
+\begin{subfigure}{.5\textwidth}
+\includegraphics[width=\textwidth]{Smart282SLA.png}
+\caption{Smart Strategy - SLA violations}
+\end{subfigure}
+
+\label{load2}
+\caption{Load Pattern 2}
+\end{figure}
+
+\begin{figure}[h!]
+\begin{subfigure}{.5\textwidth}
+\includegraphics[width=\textwidth]{Naive382nodes.png}
+\caption{Naive Strategy - active nodes}
+\end{subfigure}
+\begin{subfigure}{.5\textwidth}
+\includegraphics[width=\textwidth]{Naive382SLA.png}
+\caption{Naive Strategy - SLA violations}
+\end{subfigure}
+
+\begin{subfigure}{.5\textwidth}
+\includegraphics[width=\textwidth]{Power382nodes.png}
+\caption{Power Strategy - active nodes}
+\end{subfigure}
+\begin{subfigure}{.5\textwidth}
+\includegraphics[width=\textwidth]{Power382SLA.png}
+\caption{Power Strategy - SLA violations}
+\end{subfigure}
+
+\begin{subfigure}{.5\textwidth}
+\includegraphics[width=\textwidth]{Smart382nodes.png}
+\caption{Smart Strategy - active nodes}
+\end{subfigure}
+\begin{subfigure}{.5\textwidth}
+\includegraphics[width=\textwidth]{Smart382SLA.png}
+\caption{Smart Strategy - SLA violations}
+\end{subfigure}
+
+\label{load3}
+\caption{Load Pattern 3}
+\end{figure}
+
+\section{Conclusion}
+We have proposed an architecture and strategies for auto scaling online
+learning. In our methods and experiments, we abstracted out the online learning
+part, and presented and evaluated algorithms that are general to other auto
+scaling problems. We propose and evaluate a strategy that takes uncertainty and
+node failures into account, by modeling the cost function as an expectation.
+
+As future work, we would like to incorporate the machine learning aspect back
+into the system - possibly even coupling together learning and predicting (and
+thus modifying the cost function). This is an exciting area that is still new,
+and not a lot of research has been done on it.
+
+\clearpage
 
 \bibliographystyle{plain}
 \bibliography{references}
