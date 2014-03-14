@@ -48,7 +48,9 @@ A lot of tasks that use online learning have a particular structure that can be
 broken down into 2 major components: 1 - Learning a model from data, and 2 -
 making predictions according to the model. Going back to the web search engine
 scenario as an example: the system needs to make predictions for every user
-doing a query - and must also learn from the feedback given by those users.
+doing a query - and must also learn from the feedback given by those users. We
+call machines that make predictions \textbf{predictors}, and machines that learn
+from the feedback \textbf{learners}.
 
 This structure comes with multiple challenges. First, the 
 the amount of data is always growing, so archiving it comes at a cost, both
@@ -79,15 +81,37 @@ terms of expected cost, in order to account for uncertainty pertaining future
 load predictions and node failures. Finally, we evaluate some baselines and our
 proposed approach with simulated loads.
 
-\begin{figure}
+\section{Architecture}
+\begin{figure}[h!]
 \center
-\includegraphics[width=1.0\textwidth]{writeWrite}
-\caption{When multiple workers are simultaneously updating common parameters in the parameter server,
-write-write conflicts will arise. This diagram illustrates three sets of sparse updates have been submitted.
-How these updates are combined depends on the consistency algorithm used by the parameter server.}
-\label{writeWrite}
+\includegraphics[width=1.0\textwidth]{architecture.png}
+\caption{Architecture: Node asks the load balancer for a predictor, and then
+asks the predictor for a prediction.}
+\label{architecture}
 \end{figure}
 
+We assume an architecture similar to the one presented in Figure
+\ref{architecture}. There is a set of nodes acting as a Load Balancer
+(whose addresses are known to the clients of the machine learning service). When
+a client needs a predictor or a learner, it first requests an a node from the
+Load Balancer, and then it proceeds to make the request. In Figure
+\ref{architecture}, the client got assigned the node in red.
+
+The Load Balancer reads the state of the current system from some distributed,
+reliable storage. The state is comprised of which nodes are up and acting as
+learners or predictors, and a measure of the \textbf{power} of each node - that
+is, how many requests each node can effectively handle in a time interval. This
+allows for load balancing even when heterogeneous nodes are present.
+
+The state of the current system is modified every so often by the set of nodes
+denoted \textbf{Autoscaler} in Figure \ref{architecture}. The Autoscaler
+periodically sends heartbeat messages to nodes and to the load balancer, and
+tests the prediction / learning time. It also gets the status - i.e., the number
+of requests served, eventual node failures, etc.  Finally, it then updates the
+state in the distributed storage according to some policy. This architecture is
+very straightforward, and can be used with commodity machines for handling a lot
+of requests, while still being resilient to failures (depending of course on the
+Autoscaler policy).
 
 \bibliographystyle{plain}
 \bibliography{references}
