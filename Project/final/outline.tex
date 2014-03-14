@@ -2,7 +2,7 @@
 \usepackage[utf8]{inputenc}
 \usepackage{amsmath,amsfonts}
 \usepackage{graphicx}
-\usepackage{algorithm}
+\usepackage[]{algorithm2e}
 \usepackage{subcaption}
 
 \DeclareMathOperator*{\argmin}{arg\,min}
@@ -205,8 +205,32 @@ used for predicting loads in our experiments.
 \caption{Predicted vs Actual load, different load patterns.}
 \label{loadsss}
 \end{figure}
+\newpage
 
+~
+\newpage
 \subsection{Strategies}
+\subsubsection{Naive Strategy}
+The Naive strategy, presented in Algorithm 1, is probably the first solution
+anyone would come up with when faced with the auto scaling problem. It is a
+reactive strategy that adds more nodes when the SLA is being violated, and
+removes nodes when the SLA is far from being violated. In our experiments, we
+assumed that the SLA was based on average prediction time being smaller then
+some constant $T$, and set $C = T / 2$.
+
+\begin{algorithm}[H]
+\If{There is an SLA violation in the current time interval} {
+Add more nodes to the system
+}
+\If{The mean prediction time is smaller than some constant $C$} {
+Remove nodes from the system
+}
+\caption{Naive Strategy}
+\end{algorithm}
+
+\subsubsection{Power Strategy}
+
+
 \bibliographystyle{plain}
 \bibliography{references}
 
