@@ -243,8 +243,56 @@ Add more nodes to the system
 \While{Current Power - power($node_i$) $>$ predicted requests} {
 Remove $node_i$
 }
-\caption{Naive Strategy}
+\caption{Power Strategy}
 \end{algorithm}
+
+\subsubsection{Smart Strategy}
+The two strategies presented before do not take into account the costs
+$\alpha$ and $\beta$. Furthermore, they do not take into account the probability
+of nodes failing, or the uncertainty associated with the load prediction. A
+reformulated objective function is presented in Equation 2. Here, we are
+selecting the configuration of machines $P$ and $L$ that minimizes the expected
+cost in the next iteration.
+
+\begin{equation}
+min_{P,L}: E[cost] = E[\alpha SLA + \beta P + \gamma LR + \delta L]
+\end{equation}
+
+Keeping the learners fixed, as we did before, the reformulated objective
+becomes:
+\begin{eqnarray*}
+min_{P}: E[cost] = E[\alpha SLA + \beta P] \\
+  = \alpha E[SLA] + \beta P
+\end{eqnarray*}
+
+One way of defining a SLA violation is when we have less power in a time
+interval than needed for the number of requests. Ideally, we would integrate out
+the uncertainty over our future prediction, and calculate $E[SLA]$ as follows,
+given that $\rho$ is the probability that a node fails in the time interval, and
+each $r$ denotes a possible value for the future load.
+\begin{eqnarray*}
+E[SLA] = P(SLA | P, \rho) = \int{P(power < r | P, \rho, r)dr}
+\end{eqnarray*}
+
+This would require a more reliable estimator of future load, one that could
+output a probability distribution over the possible values of $r$. There are
+multiple machine learning algorithms that can do this, but since we are only
+using the trend in the last interval as a feature, we did not think it
+worthwhile to pursue this route for this project. Therefore, we assumed that the
+prediction for the future load was correct. $E[SLA]$ then becomes as following,
+noting that $k$ is the minimum number of nodes required for the system's power
+to be greater than the number of requests:
+
+\begin{eqnarray*}
+P(SLA | P, \rho, requests) = P(power < requests | P, \rho)\\
+ = P(|\text{non failing nodes}| < k) \\ \approx CDF Binomial (P, k-1, 1 - \rho)
+\end{eqnarray*}
+
+Note that the last approximation depends on the nodes' power being close to
+uniform. This is a reasonable assumption on most cases. The smart strategy,
+therefore, amounts to picking $P$ such that the expected cost function presented
+in Equation 2 is minimized.
+
 
 
 \bibliographystyle{plain}
