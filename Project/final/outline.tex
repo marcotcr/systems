@@ -229,6 +229,22 @@ Remove nodes from the system
 \end{algorithm}
 
 \subsubsection{Power Strategy}
+The Power strategy, depicted in Algorithm 2, takes into account the power (number of requests the machine
+can handle) of each node, and compares the sum of the power of all the current
+nodes against the number of predicted requests for the next time interval. If
+the current power of the system is smaller than the predicted requests, it adds
+more nodes. If removing nodes does not cause the power of the system to be
+smaller than the number of predicted requests, it removes nodes.
+
+\begin{algorithm}[H]
+\While{Current Power $<$ predicted requests} {
+Add more nodes to the system
+}
+\While{Current Power - power($node_i$) $>$ predicted requests} {
+Remove $node_i$
+}
+\caption{Naive Strategy}
+\end{algorithm}
 
 
 \bibliographystyle{plain}
